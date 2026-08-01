@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "701202517558",
+    "project_id": "association-varecia",
+    "storage_bucket": "association-varecia.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:701202517558:android:8ae5614467416c5397d297",
+        "android_client_info": {
+          "package_name": "com.varecia.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-4qz2I6lJCDYLlPehnheut7PFIFZV6Y4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

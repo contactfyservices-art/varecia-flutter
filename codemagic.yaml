@@ -1,0 +1,24 @@
+workflows:
+  android-apk:
+    name: Varecia App — Build APK
+    max_build_duration: 30
+    environment:
+      flutter: stable
+      android_signing:
+        - varecia_keystore  # à créer dans Codemagic > Team settings > Code signing identities (optionnel pour un simple test)
+    scripts:
+      - name: Récupérer les dépendances
+        script: |
+          flutter pub get
+      - name: Build APK (release)
+        script: |
+          flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+    publishing:
+      email:
+        recipients:
+          - votre-email@exemple.com  # à remplacer par ton e-mail pour recevoir l'APK
+        notify:
+          success: true
+          failure: true
