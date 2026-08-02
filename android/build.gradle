@@ -4,11 +4,9 @@ buildscript {
         google()
         mavenCentral()
     }
-
     dependencies {
         classpath 'com.android.tools.build:gradle:8.9.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        // Google Services (Firebase) — nécessaire pour lire google-services.json
         classpath 'com.google.gms:google-services:4.4.0'
     }
 }
