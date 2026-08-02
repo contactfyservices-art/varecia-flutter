@@ -27,6 +27,7 @@ dependencies:
 
   # Fonctionnalités
   image_picker: ^1.0.4
+  file_picker: ^6.1.1
   audioplayers: ^5.2.1
   jitsi_meet_flutter_sdk: ^10.2.0
   intl: ^0.18.1
