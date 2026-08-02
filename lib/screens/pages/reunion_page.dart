@@ -19,12 +19,12 @@ class ReunionPage extends StatefulWidget {
 class _ReunionPageState extends State<ReunionPage> {
   final _fs = FirestoreService.instance;
   final _jitsi = JitsiMeet();
+  bool? _wasActive; // état précédent, pour détecter le passage à "actif"
 
   Future<void> _startMeeting() async {
     final room = 'varecia-${DateTime.now().millisecondsSinceEpoch}';
     await _fs.setJSON('meeting', {'active': true, 'room': room});
     await _fs.setJSON('meetingRequests', []);
-    SoundService.instance.playSuccess();
     _join(room);
   }
 
@@ -74,6 +74,15 @@ class _ReunionPageState extends State<ReunionPage> {
         final active = meeting['active'] == true;
         final room = meeting['room'] as String?;
 
+        // Notification sonore pour TOUT LE MONDE (pas seulement l'admin)
+        // dès que la réunion passe de "inactive" à "active".
+        if (_wasActive == false && active == true) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            SoundService.instance.playSuccess();
+          });
+        }
+        _wasActive = active;
+
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -121,9 +130,6 @@ class _ReunionPageState extends State<ReunionPage> {
                   ],
                 ),
               ),
-              // Liste des demandes de parole — visible uniquement par
-              // l'organisateur (admin), avec possibilité d'approuver
-              // (= retirer de la liste d'attente une fois traité).
               if (active && isAdmin) ...[
                 const SizedBox(height: 16),
                 StreamBuilder(
