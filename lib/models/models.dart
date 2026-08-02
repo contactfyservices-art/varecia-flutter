@@ -41,6 +41,29 @@ class AppUser {
       };
 
   String get fullName => '$prenom $nom';
+
+  /// Retourne une copie de cet utilisateur avec certains champs remplacés.
+  /// Nécessaire pour mettre à jour la photo affichée sans refaire un
+  /// appel Firestore (corrige le bug de photo qui ne s'affichait pas).
+  AppUser copyWith({
+    String? email,
+    String? prenom,
+    String? nom,
+    String? niveau,
+    String? passwordHash,
+    String? status,
+    String? photo,
+  }) {
+    return AppUser(
+      email: email ?? this.email,
+      prenom: prenom ?? this.prenom,
+      nom: nom ?? this.nom,
+      niveau: niveau ?? this.niveau,
+      passwordHash: passwordHash ?? this.passwordHash,
+      status: status ?? this.status,
+      photo: photo ?? this.photo,
+    );
+  }
 }
 
 class Post {
