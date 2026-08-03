@@ -1,149 +1,100 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../../models/models.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
 
-class SondagePage extends StatefulWidget {
-  const SondagePage({super.key});
+class AccueilPage extends StatefulWidget {
+  const AccueilPage({super.key});
   @override
-  State<SondagePage> createState() => _SondagePageState();
+  State<AccueilPage> createState() => _AccueilPageState();
 }
 
-class _SondagePageState extends State<SondagePage> {
+class _AccueilPageState extends State<AccueilPage> {
   final _fs = FirestoreService.instance;
-  final _textCtrl = TextEditingController();
-
-  Future<void> _add(AppUser user) async {
-    if (_textCtrl.text.trim().isEmpty) return;
-    final posts = await _fs.getJSON('posts', []) as List;
-    posts.add(Post(
-      index: posts.length,
-      author: user.fullName,
-      authorEmail: user.email,
-      text: _textCtrl.text.trim(),
-      date: DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
-    ).toMap());
-    await _fs.setJSON('posts', posts);
-    _textCtrl.clear();
-    SoundService.instance.playSuccess();
-  }
-
-  Future<void> _delete(int index) async {
-    final posts = await _fs.getJSON('posts', []) as List;
-    posts.removeAt(index);
-    await _fs.setJSON('posts', posts);
-  }
-
-  Future<void> _edit(int index, String currentText) async {
-    final ctrl = TextEditingController(text: currentText);
-    final newText = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Modifier la note'),
-        content: TextField(controller: ctrl, maxLines: 4),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, ctrl.text),
-              child: const Text('Enregistrer')),
-        ],
-      ),
-    );
-    if (newText == null) return;
-    final posts = await _fs.getJSON('posts', []) as List;
-    posts[index]['text'] = newText;
-    await _fs.setJSON('posts', posts);
-  }
+  final _editCtrl = TextEditingController();
+  bool _editing = false;
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthService>().currentUser;
     final isAdmin = context.watch<AuthService>().isAdmin;
 
     return StreamBuilder(
-      stream: _fs.watchJSON('posts', []),
+      stream: _fs.watchJSON('content_accueil', {'text': ''}),
       builder: (context, snapshot) {
-        final posts = (snapshot.data ?? []) as List;
-        final reversed = posts.asMap().entries.toList().reversed.toList();
+        final data = (snapshot.data ?? {'text': ''}) as Map;
+        final text = data['text'] ?? '';
 
         return RefreshIndicator(
           onRefresh: () async => setState(() {}),
-          child: ListView(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
-            children: [
-              Text('Notes & remarques',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              GlassCard(
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _textCtrl,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                          hintText: 'Partagez une note, une remarque...'),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: user == null ? null : () => _add(user),
-                        child: const Text('Publier'),
+            child: GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('Accueil',
+                            style: Theme.of(context).textTheme.titleLarge),
                       ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'Réactualiser',
+                        onPressed: () => setState(() {}),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (!_editing)
+                    Text(
+                      text.isEmpty ? 'Aucun contenu pour le moment.' : text,
+                      style: TextStyle(color: text.isEmpty ? Colors.grey : null),
+                    )
+                  else
+                    TextField(
+                      controller: _editCtrl,
+                      maxLines: 8,
+                      decoration: const InputDecoration(
+                          hintText: 'Rédigez le contenu...'),
+                    ),
+                  if (isAdmin) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        if (!_editing)
+                          ElevatedButton(
+                            onPressed: () {
+                              _editCtrl.text = text;
+                              setState(() => _editing = true);
+                            },
+                            child: const Text('Modifier'),
+                          )
+                        else ...[
+                          ElevatedButton(
+                            onPressed: () async {
+                              await _fs.setJSON(
+                                  'content_accueil', {'text': _editCtrl.text});
+                              SoundService.instance.playSuccess();
+                              setState(() => _editing = false);
+                            },
+                            child: const Text('Enregistrer'),
+                          ),
+                          const SizedBox(width: 10),
+                          TextButton(
+                            onPressed: () => setState(() => _editing = false),
+                            child: const Text('Annuler'),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
-                ),
+                ],
               ),
-              const SizedBox(height: 16),
-              if (posts.isEmpty)
-                const Text('Aucune note pour le moment.',
-                    style: TextStyle(color: Colors.grey)),
-              for (final entry in reversed)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: GlassCard(
-                    child: Builder(builder: (context) {
-                      final p = Post.fromMap(
-                          Map<String, dynamic>.from(entry.value), entry.key);
-                      final canEdit = isAdmin || p.authorEmail == user?.email;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.author,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(p.date,
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey)),
-                          const SizedBox(height: 4),
-                          Text(p.text),
-                          if (canEdit) ...[
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                TextButton(
-                                  onPressed: () => _edit(p.index, p.text),
-                                  child: const Text('Modifier'),
-                                ),
-                                TextButton(
-                                  onPressed: () => _delete(p.index),
-                                  child: const Text('Supprimer'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      );
-                    }),
-                  ),
-                ),
-            ],
+            ),
           ),
         );
       },
