@@ -64,6 +64,25 @@ class _AdminPageState extends State<AdminPage> {
     SoundService.instance.playSuccess();
   }
 
+  Future<void> _setSection(String email, String section) async {
+    final users = await _fs.getJSON('users', []) as List;
+    final idx = users.indexWhere((u) => u['email'] == email);
+    if (idx != -1) {
+      users[idx]['section'] = section;
+      await _fs.setJSON('users', users);
+      SoundService.instance.playSuccess();
+    }
+  }
+
+  Future<void> _toggleActive(String email, bool value) async {
+    final users = await _fs.getJSON('users', []) as List;
+    final idx = users.indexWhere((u) => u['email'] == email);
+    if (idx != -1) {
+      users[idx]['active'] = value;
+      await _fs.setJSON('users', users);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
@@ -71,6 +90,8 @@ class _AdminPageState extends State<AdminPage> {
       builder: (context, usersSnap) {
         final users = (usersSnap.data ?? []) as List;
         final pending = users.where((u) => u['status'] == 'pending').toList();
+        final approved =
+            users.where((u) => u['status'] == 'approved').toList();
 
         return StreamBuilder(
           stream: _fs.watchJSON('admins', []),
@@ -112,6 +133,36 @@ class _AdminPageState extends State<AdminPage> {
                               ),
                             ],
                           ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // === Liste des membres inscrits (approuvés) ===
+                GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Membres inscrits',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('${approved.length} membre(s)',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey)),
+                      const SizedBox(height: 8),
+                      if (approved.isEmpty)
+                        const Text('Aucun membre inscrit pour le moment.',
+                            style: TextStyle(color: Colors.grey)),
+                      for (final u in approved)
+                        _MemberRow(
+                          name: '${u['prenom']} ${u['nom']}',
+                          email: u['email'],
+                          section: u['section'] ?? '',
+                          active: u['active'] ?? true,
+                          onSectionChanged: (s) => _setSection(u['email'], s),
+                          onActiveChanged: (v) =>
+                              _toggleActive(u['email'], v),
                         ),
                     ],
                   ),
@@ -195,6 +246,88 @@ class _AdminPageState extends State<AdminPage> {
           },
         );
       },
+    );
+  }
+}
+
+/// Une ligne "membre" dans la liste admin : nom, e-mail, sélecteur de
+/// section (A/B/C/aucune), et interrupteur actif/inactif.
+class _MemberRow extends StatelessWidget {
+  final String name;
+  final String email;
+  final String section;
+  final bool active;
+  final ValueChanged<String> onSectionChanged;
+  final ValueChanged<bool> onActiveChanged;
+
+  const _MemberRow({
+    required this.name,
+    required this.email,
+    required this.section,
+    required this.active,
+    required this.onSectionChanged,
+    required this.onActiveChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+            bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Pastille verte = actif, rien = inactif (demande #2)
+              if (active)
+                Container(
+                  width: 10,
+                  height: 10,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: const BoxDecoration(
+                      color: Colors.green, shape: BoxShape.circle),
+                )
+              else
+                const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(email,
+                        style:
+                            const TextStyle(fontSize: 11, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              Switch(value: active, onChanged: onActiveChanged),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Text('Section : ', style: TextStyle(fontSize: 13)),
+              const SizedBox(width: 4),
+              DropdownButton<String>(
+                value: section.isEmpty ? null : section,
+                hint: const Text('Aucune'),
+                items: const [
+                  DropdownMenuItem(value: 'A', child: Text('A')),
+                  DropdownMenuItem(value: 'B', child: Text('B')),
+                  DropdownMenuItem(value: 'C', child: Text('C')),
+                ],
+                onChanged: (v) => onSectionChanged(v ?? ''),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
