@@ -72,75 +72,79 @@ class _SondagePageState extends State<SondagePage> {
         final posts = (snapshot.data ?? []) as List;
         final reversed = posts.asMap().entries.toList().reversed.toList();
 
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text('Notes & remarques',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            GlassCard(
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _textCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                        hintText: 'Partagez une note, une remarque...'),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: user == null ? null : () => _add(user),
-                      child: const Text('Publier'),
+        return RefreshIndicator(
+          onRefresh: () async => setState(() {}),
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text('Notes & remarques',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              GlassCard(
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _textCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                          hintText: 'Partagez une note, une remarque...'),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (posts.isEmpty)
-              const Text('Aucune note pour le moment.',
-                  style: TextStyle(color: Colors.grey)),
-            for (final entry in reversed)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: GlassCard(
-                  child: Builder(builder: (context) {
-                    final p = Post.fromMap(
-                        Map<String, dynamic>.from(entry.value), entry.key);
-                    final canEdit = isAdmin || p.authorEmail == user?.email;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(p.author,
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text(p.date,
-                            style:
-                                const TextStyle(fontSize: 11, color: Colors.grey)),
-                        const SizedBox(height: 4),
-                        Text(p.text),
-                        if (canEdit) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              TextButton(
-                                onPressed: () => _edit(p.index, p.text),
-                                child: const Text('Modifier'),
-                              ),
-                              TextButton(
-                                onPressed: () => _delete(p.index),
-                                child: const Text('Supprimer'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    );
-                  }),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: user == null ? null : () => _add(user),
+                        child: const Text('Publier'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-          ],
+              const SizedBox(height: 16),
+              if (posts.isEmpty)
+                const Text('Aucune note pour le moment.',
+                    style: TextStyle(color: Colors.grey)),
+              for (final entry in reversed)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: GlassCard(
+                    child: Builder(builder: (context) {
+                      final p = Post.fromMap(
+                          Map<String, dynamic>.from(entry.value), entry.key);
+                      final canEdit = isAdmin || p.authorEmail == user?.email;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(p.author,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(p.date,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey)),
+                          const SizedBox(height: 4),
+                          Text(p.text),
+                          if (canEdit) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                TextButton(
+                                  onPressed: () => _edit(p.index, p.text),
+                                  child: const Text('Modifier'),
+                                ),
+                                TextButton(
+                                  onPressed: () => _delete(p.index),
+                                  child: const Text('Supprimer'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
