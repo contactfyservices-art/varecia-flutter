@@ -66,84 +66,91 @@ class _GaleriePageState extends State<GaleriePage> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-        ),
-        child: StatefulBuilder(builder: (ctx, setSheetState) {
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Commentaires', style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 260),
-                child: it.comments.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text('Aucun commentaire pour le moment.',
-                            style: TextStyle(color: Colors.grey)),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: it.comments.length,
-                        itemBuilder: (_, i) {
-                          final c = it.comments[i];
-                          return ListTile(
-                            dense: true,
-                            title: Text(c['author'] ?? '',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13)),
-                            subtitle: Text(c['text'] ?? ''),
-                          );
-                        },
-                      ),
-              ),
-              const Divider(),
-              Row(
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: GlassCard(
+            borderRadius: 0,
+            child: StatefulBuilder(builder: (ctx, setSheetState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: ctrl,
-                      decoration:
-                          const InputDecoration(hintText: 'Ajouter un commentaire...'),
-                    ),
+                  Text('Commentaires', style: Theme.of(ctx).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    child: it.comments.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Text('Aucun commentaire pour le moment.',
+                                style: TextStyle(color: Colors.grey)),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: it.comments.length,
+                            itemBuilder: (_, i) {
+                              final c = it.comments[i];
+                              return ListTile(
+                                dense: true,
+                                title: Text(c['author'] ?? '',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 13)),
+                                subtitle: Text(c['text'] ?? ''),
+                              );
+                            },
+                          ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: user == null
-                        ? null
-                        : () async {
-                            if (ctrl.text.trim().isEmpty) return;
-                            final items =
-                                await _fs.getJSON('gallery', []) as List;
-                            final comments = List<Map<String, dynamic>>.from(
-                                items[index]['comments'] ?? []);
-                            comments.add({
-                              'author': user.fullName,
-                              'authorEmail': user.email,
-                              'text': ctrl.text.trim(),
-                            });
-                            items[index]['comments'] = comments;
-                            await _fs.setJSON('gallery', items);
-                            SoundService.instance.playSuccess();
-                            ctrl.clear();
-                            setSheetState(() {
-                              it.comments
-                                ..clear()
-                                ..addAll(comments);
-                            });
-                          },
+                  const Divider(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: ctrl,
+                          decoration: const InputDecoration(
+                              hintText: 'Ajouter un commentaire...'),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.send),
+                        onPressed: user == null
+                            ? null
+                            : () async {
+                                if (ctrl.text.trim().isEmpty) return;
+                                final items =
+                                    await _fs.getJSON('gallery', []) as List;
+                                final comments = List<Map<String, dynamic>>.from(
+                                    items[index]['comments'] ?? []);
+                                comments.add({
+                                  'author': user.fullName,
+                                  'authorEmail': user.email,
+                                  'text': ctrl.text.trim(),
+                                });
+                                items[index]['comments'] = comments;
+                                await _fs.setJSON('gallery', items);
+                                SoundService.instance.playSuccess();
+                                ctrl.clear();
+                                setSheetState(() {
+                                  it.comments
+                                    ..clear()
+                                    ..addAll(comments);
+                                });
+                              },
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
-          );
-        }),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
@@ -156,112 +163,174 @@ class _GaleriePageState extends State<GaleriePage> {
     return StreamBuilder(
       stream: _fs.watchJSON('gallery', []),
       builder: (context, snapshot) {
-        final items = (snapshot.data ?? []) as List;
+        final rawItems = (snapshot.data ?? []) as List;
+        // Ordre "fil d'actualité" : le plus récent en premier
+        final items = rawItems.asMap().entries.toList().reversed.toList();
 
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text('Albums photos', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            if (isAdmin)
-              GlassCard(
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _captionCtrl,
-                      decoration: const InputDecoration(labelText: 'Légende'),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: user == null ? null : () => _addPhoto(user),
-                      icon: const Icon(Icons.add_a_photo),
-                      label: const Text('Publier une photo'),
-                    ),
-                  ],
-                ),
+        return RefreshIndicator(
+          onRefresh: () async => setState(() {}),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text('Albums photos',
+                    style: Theme.of(context).textTheme.titleLarge),
               ),
-            const SizedBox(height: 16),
-            if (items.isEmpty)
-              const Text('Aucune publication pour le moment.',
-                  style: TextStyle(color: Colors.grey)),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 220,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.8,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, i) {
-                final it = GalleryItem.fromMap(
-                    Map<String, dynamic>.from(items[i]), i);
-                final liked = it.likes.contains(user?.email);
-                final canEdit = isAdmin || it.authorEmail == user?.email;
-                return GlassCard(
-                  padding: EdgeInsets.zero,
-                  child: Column(
-                    children: [
-                      if (it.image != null)
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(20)),
-                            child: Image.memory(
-                              base64Decode(it.image!.split(',').last),
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                            ),
+              const SizedBox(height: 12),
+              if (isAdmin)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: GlassCard(
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _captionCtrl,
+                          decoration: const InputDecoration(labelText: 'Légende'),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: user == null ? null : () => _addPhoto(user),
+                            icon: const Icon(Icons.add_a_photo),
+                            label: const Text('Publier une photo'),
                           ),
                         ),
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(it.caption,
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                      liked
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      size: 18),
-                                  onPressed: user == null
-                                      ? null
-                                      : () => _toggleLike(i, user.email),
-                                ),
-                                Text('${it.likes.length}'),
-                                IconButton(
-                                  icon: const Icon(Icons.mode_comment_outlined,
-                                      size: 18),
-                                  onPressed: () =>
-                                      _openComments(i, it, user),
-                                ),
-                                Text('${it.comments.length}'),
-                                const Spacer(),
-                                if (canEdit)
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline,
-                                        size: 18),
-                                    onPressed: () => _delete(i),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                );
-              },
-            ),
-          ],
+                ),
+              const SizedBox(height: 12),
+              if (items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Text('Aucune publication pour le moment.',
+                      style: TextStyle(color: Colors.grey)),
+                ),
+              // Fil en une seule colonne, pleine largeur, hauteur d'image
+              // fixe et cohérente — comme un fil Instagram.
+              for (final entry in items)
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: _PostCard(
+                    item: GalleryItem.fromMap(
+                        Map<String, dynamic>.from(entry.value), entry.key),
+                    index: entry.key,
+                    userEmail: user?.email,
+                    canEdit: isAdmin || entry.value['authorEmail'] == user?.email,
+                    onLike: () => _toggleLike(entry.key, user?.email ?? ''),
+                    onComment: () => _openComments(
+                        entry.key,
+                        GalleryItem.fromMap(
+                            Map<String, dynamic>.from(entry.value), entry.key),
+                        user),
+                    onDelete: () => _delete(entry.key),
+                  ),
+                ),
+            ],
+          ),
         );
       },
+    );
+  }
+}
+
+/// Carte de publication style "post Instagram" : en-tête avec l'auteur,
+/// image pleine largeur à ratio fixe (4:5, comme Instagram), puis
+/// actions (like / commentaire) et légende.
+class _PostCard extends StatelessWidget {
+  final GalleryItem item;
+  final int index;
+  final String? userEmail;
+  final bool canEdit;
+  final VoidCallback onLike;
+  final VoidCallback onComment;
+  final VoidCallback onDelete;
+
+  const _PostCard({
+    required this.item,
+    required this.index,
+    required this.userEmail,
+    required this.canEdit,
+    required this.onLike,
+    required this.onComment,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final liked = item.likes.contains(userEmail);
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  child: Text(item.author.isNotEmpty
+                      ? item.author[0].toUpperCase()
+                      : '?'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(item.author,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                if (canEdit)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: onDelete,
+                  ),
+              ],
+            ),
+          ),
+          if (item.image != null)
+            AspectRatio(
+              // Hauteur cohérente pour toutes les photos, quel que
+              // soit leur format d'origine — même sensation qu'Instagram.
+              aspectRatio: 4 / 5,
+              child: Image.memory(
+                base64Decode(item.image!.split(',').last),
+                fit: BoxFit.cover,
+                width: double.infinity,
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(liked ? Icons.favorite : Icons.favorite_border,
+                          color: liked ? Colors.redAccent : null),
+                      onPressed: onLike,
+                    ),
+                    Text('${item.likes.length}'),
+                    IconButton(
+                      icon: const Icon(Icons.mode_comment_outlined),
+                      onPressed: onComment,
+                    ),
+                    Text('${item.comments.length}'),
+                  ],
+                ),
+                if (item.caption.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(item.caption),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
