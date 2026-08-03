@@ -10,27 +10,18 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
-
-  # Backend
   firebase_core: ^2.24.0
   cloud_firestore: ^4.13.0
-
-  # State management
   provider: ^6.1.1
-
-  # Persistance de session locale
   shared_preferences: ^2.2.2
-
-  # UI
   google_fonts: ^6.1.0
   flutter_animate: ^4.3.0
-
-  # Fonctionnalités
   image_picker: ^1.0.4
   file_picker: ^8.1.2
   audioplayers: ^5.2.1
   jitsi_meet_flutter_sdk: ^10.2.0
   intl: ^0.18.1
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:
