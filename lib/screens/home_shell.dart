@@ -11,12 +11,13 @@ import 'pages/sondage_page.dart';
 import 'pages/profil_page.dart';
 import 'pages/admin_page.dart';
 import 'pages/ma_section_page.dart';
+import 'pages/messages_page.dart';
 
 class _Dest {
   final String label;
   final IconData icon;
   final Widget page;
-  final String? badgeKey; // clé Firestore suivie pour le badge (null = pas de badge)
+  final String? badgeKey;
   const _Dest(this.label, this.icon, this.page, {this.badgeKey});
 }
 
@@ -49,6 +50,7 @@ class _HomeShellState extends State<HomeShell> {
           badgeKey: 'gallery'),
       const _Dest('Notes', Icons.forum_outlined, SondagePage(),
           badgeKey: 'posts'),
+      const _Dest('Messages', Icons.chat_bubble_outline, MessagesPage()),
       const _Dest('Ma Section', Icons.groups_outlined, MaSectionPage()),
       const _Dest('Profil', Icons.person_outline, ProfilPage()),
       if (isAdmin)
