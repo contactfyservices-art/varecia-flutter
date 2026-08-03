@@ -20,39 +20,56 @@ class _GaleriePageState extends State<GaleriePage> {
   final _captionCtrl = TextEditingController();
 
   Future<void> _addPhoto(AppUser user) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-        source: ImageSource.gallery, imageQuality: 70, maxWidth: 1000);
-    if (picked == null) return;
-    final bytes = await File(picked.path).readAsBytes();
-    if (bytes.lengthInBytes > 4.5 * 1024 * 1024) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image trop volumineuse (max ~4,5 Mo).')));
-      return;
-    }
-    final b64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+          source: ImageSource.gallery, imageQuality: 70, maxWidth: 1000);
+      if (picked == null) return;
+      final bytes = await File(picked.path).readAsBytes();
+      if (bytes.lengthInBytes > 4.5 * 1024 * 1024) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Image trop volumineuse (max ~4,5 Mo).')));
+        return;
+      }
+      final b64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
-    final items = await _fs.getJSON('gallery', []) as List;
-    items.add(GalleryItem(
-      index: items.length,
-      image: b64,
-      caption: _captionCtrl.text.trim(),
-      author: user.fullName,
-      authorEmail: user.email,
-      likes: [],
-      comments: [],
-    ).toMap());
-    await _fs.setJSON('gallery', items);
-    _captionCtrl.clear();
-    SoundService.instance.playSuccess();
+      final items = await _fs.getJSON('gallery', []) as List;
+      items.add(GalleryItem(
+        index: items.length,
+        image: b64,
+        caption: _captionCtrl.text.trim(),
+        author: user.fullName,
+        authorEmail: user.email,
+        likes: [],
+        comments: [],
+      ).toMap());
+      await _fs.setJSON('gallery', items);
+      _captionCtrl.clear();
+      SoundService.instance.playSuccess();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Photo publiée !')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Échec de la publication : $e')));
+    }
   }
 
   Future<void> _toggleLike(int index, String email) async {
-    final items = await _fs.getJSON('gallery', []) as List;
-    final likes = List<String>.from(items[index]['likes'] ?? []);
-    likes.contains(email) ? likes.remove(email) : likes.add(email);
-    items[index]['likes'] = likes;
-    await _fs.setJSON('gallery', items);
+    try {
+      final items = await _fs.getJSON('gallery', []) as List;
+      final likes = List<String>.from(items[index]['likes'] ?? []);
+      likes.contains(email) ? likes.remove(email) : likes.add(email);
+      items[index]['likes'] = likes;
+      await _fs.setJSON('gallery', items);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    }
   }
 
   Future<void> _delete(int index) async {
@@ -124,24 +141,30 @@ class _GaleriePageState extends State<GaleriePage> {
                             ? null
                             : () async {
                                 if (ctrl.text.trim().isEmpty) return;
-                                final items =
-                                    await _fs.getJSON('gallery', []) as List;
-                                final comments = List<Map<String, dynamic>>.from(
-                                    items[index]['comments'] ?? []);
-                                comments.add({
-                                  'author': user.fullName,
-                                  'authorEmail': user.email,
-                                  'text': ctrl.text.trim(),
-                                });
-                                items[index]['comments'] = comments;
-                                await _fs.setJSON('gallery', items);
-                                SoundService.instance.playSuccess();
-                                ctrl.clear();
-                                setSheetState(() {
-                                  it.comments
-                                    ..clear()
-                                    ..addAll(comments);
-                                });
+                                try {
+                                  final items =
+                                      await _fs.getJSON('gallery', []) as List;
+                                  final comments =
+                                      List<Map<String, dynamic>>.from(
+                                          items[index]['comments'] ?? []);
+                                  comments.add({
+                                    'author': user.fullName,
+                                    'authorEmail': user.email,
+                                    'text': ctrl.text.trim(),
+                                  });
+                                  items[index]['comments'] = comments;
+                                  await _fs.setJSON('gallery', items);
+                                  SoundService.instance.playSuccess();
+                                  ctrl.clear();
+                                  setSheetState(() {
+                                    it.comments
+                                      ..clear()
+                                      ..addAll(comments);
+                                  });
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Erreur : $e')));
+                                }
                               },
                       ),
                     ],
@@ -164,7 +187,6 @@ class _GaleriePageState extends State<GaleriePage> {
       stream: _fs.watchJSON('gallery', []),
       builder: (context, snapshot) {
         final rawItems = (snapshot.data ?? []) as List;
-        // Ordre "fil d'actualité" : le plus récent en premier
         final items = rawItems.asMap().entries.toList().reversed.toList();
 
         return RefreshIndicator(
@@ -192,7 +214,16 @@ class _GaleriePageState extends State<GaleriePage> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: user == null ? null : () => _addPhoto(user),
+                            onPressed: () {
+                              if (user == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Session non chargée — réessaie dans un instant.')));
+                                return;
+                              }
+                              _addPhoto(user);
+                            },
                             icon: const Icon(Icons.add_a_photo),
                             label: const Text('Publier une photo'),
                           ),
@@ -208,8 +239,6 @@ class _GaleriePageState extends State<GaleriePage> {
                   child: Text('Aucune publication pour le moment.',
                       style: TextStyle(color: Colors.grey)),
                 ),
-              // Fil en une seule colonne, pleine largeur, hauteur d'image
-              // fixe et cohérente — comme un fil Instagram.
               for (final entry in items)
                 Padding(
                   padding:
@@ -237,9 +266,6 @@ class _GaleriePageState extends State<GaleriePage> {
   }
 }
 
-/// Carte de publication style "post Instagram" : en-tête avec l'auteur,
-/// image pleine largeur à ratio fixe (4:5, comme Instagram), puis
-/// actions (like / commentaire) et légende.
 class _PostCard extends StatelessWidget {
   final GalleryItem item;
   final int index;
@@ -292,8 +318,6 @@ class _PostCard extends StatelessWidget {
           ),
           if (item.image != null)
             AspectRatio(
-              // Hauteur cohérente pour toutes les photos, quel que
-              // soit leur format d'origine — même sensation qu'Instagram.
               aspectRatio: 4 / 5,
               child: Image.memory(
                 base64Decode(item.image!.split(',').last),
