@@ -6,9 +6,11 @@ class AppUser {
   final String prenom;
   final String nom;
   final String niveau;
-  final String passwordHash; // conservé pour compatibilité, non utilisé si Firebase Auth activé
+  final String passwordHash;
   final String status; // "pending" | "approved"
   final String? photo;
+  final String section; // "" | "A" | "B" | "C" — assignée par l'admin
+  final bool active; // membre actif ou non, géré par l'admin
 
   AppUser({
     required this.email,
@@ -18,6 +20,8 @@ class AppUser {
     required this.passwordHash,
     required this.status,
     this.photo,
+    this.section = '',
+    this.active = true,
   });
 
   factory AppUser.fromMap(Map<String, dynamic> m) => AppUser(
@@ -28,6 +32,8 @@ class AppUser {
         passwordHash: m['password'] ?? '',
         status: m['status'] ?? 'pending',
         photo: m['photo'],
+        section: m['section'] ?? '',
+        active: m['active'] ?? true,
       );
 
   Map<String, dynamic> toMap() => {
@@ -38,13 +44,12 @@ class AppUser {
         'password': passwordHash,
         'status': status,
         if (photo != null) 'photo': photo,
+        'section': section,
+        'active': active,
       };
 
   String get fullName => '$prenom $nom';
 
-  /// Retourne une copie de cet utilisateur avec certains champs remplacés.
-  /// Nécessaire pour mettre à jour la photo affichée sans refaire un
-  /// appel Firestore (corrige le bug de photo qui ne s'affichait pas).
   AppUser copyWith({
     String? email,
     String? prenom,
@@ -53,6 +58,8 @@ class AppUser {
     String? passwordHash,
     String? status,
     String? photo,
+    String? section,
+    bool? active,
   }) {
     return AppUser(
       email: email ?? this.email,
@@ -62,12 +69,14 @@ class AppUser {
       passwordHash: passwordHash ?? this.passwordHash,
       status: status ?? this.status,
       photo: photo ?? this.photo,
+      section: section ?? this.section,
+      active: active ?? this.active,
     );
   }
 }
 
 class Post {
-  final int index; // position dans le tableau Firestore
+  final int index;
   final String author;
   final String authorEmail;
   final String text;
@@ -104,7 +113,7 @@ class LibraryItem {
   final String authorEmail;
   final String date;
   final String? link;
-  final String? fileData; // base64
+  final String? fileData;
   final String? fileName;
   final String? fileType;
 
@@ -147,12 +156,12 @@ class LibraryItem {
 
 class GalleryItem {
   final int index;
-  final String? image; // base64
+  final String? image;
   final String? videoLink;
   final String caption;
   final String author;
   final String authorEmail;
-  final List<String> likes; // emails
+  final List<String> likes;
   final List<Map<String, dynamic>> comments;
 
   GalleryItem({
