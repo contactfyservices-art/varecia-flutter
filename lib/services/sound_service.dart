@@ -1,35 +1,46 @@
 import 'package:audioplayers/audioplayers.dart';
 
-/// Design sonore de l'appli : un son doux pour les actions réussies,
-/// un son distinct pour les erreurs. Coupable via le réglage du profil.
+/// Design sonore de l'appli.
 ///
-/// IMPORTANT : les fichiers audio ne sont pas fournis avec ce projet —
-/// ajoute tes propres fichiers courts (< 1s) dans assets/sounds/ :
+/// IMPORTANT : ajoute tes propres fichiers courts dans assets/sounds/ :
 ///   - success.mp3  (clochette feuille / pop organique)
 ///   - error.mp3    (buzz doux)
-/// puis vérifie qu'ils sont bien déclarés dans pubspec.yaml (déjà fait,
-/// tout le dossier assets/sounds/ est inclus).
+///   - ringtone.mp3 (sonnerie d'appel, boucle courte 2-4s, style vibrant)
 class SoundService {
   SoundService._();
   static final instance = SoundService._();
 
   final _player = AudioPlayer();
+  final _ringtonePlayer = AudioPlayer();
   bool enabled = true;
 
   Future<void> playSuccess() async {
     if (!enabled) return;
     try {
       await _player.play(AssetSource('sounds/success.mp3'));
-    } catch (_) {
-      // Fichier son manquant : on ignore silencieusement plutôt que
-      // de faire planter l'app.
-    }
+    } catch (_) {}
   }
 
   Future<void> playError() async {
     if (!enabled) return;
     try {
       await _player.play(AssetSource('sounds/error.mp3'));
+    } catch (_) {}
+  }
+
+  /// Démarre la sonnerie d'appel EN BOUCLE — reste active tant que
+  /// [stopRingtone] n'est pas appelé (quand on rejoint ou ignore l'appel).
+  Future<void> playRingtone() async {
+    if (!enabled) return;
+    try {
+      await _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
+      await _ringtonePlayer.play(AssetSource('sounds/ringtone.mp3'));
+    } catch (_) {}
+  }
+
+  Future<void> stopRingtone() async {
+    try {
+      await _ringtonePlayer.stop();
     } catch (_) {}
   }
 }
