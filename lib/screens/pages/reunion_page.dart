@@ -6,10 +6,6 @@ import '../../services/firestore_service.dart';
 import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
 
-/// Contrairement à la version HTML (qui affichait parfois un choix
-/// "rejoindre depuis navigateur/appli"), cette version Flutter utilise
-/// le SDK Jitsi natif : la vidéo s'intègre directement dans l'appli,
-/// l'utilisateur ne la quitte jamais.
 class ReunionPage extends StatefulWidget {
   const ReunionPage({super.key});
   @override
@@ -19,7 +15,9 @@ class ReunionPage extends StatefulWidget {
 class _ReunionPageState extends State<ReunionPage> {
   final _fs = FirestoreService.instance;
   final _jitsi = JitsiMeet();
-  bool? _wasActive; // état précédent, pour détecter le passage à "actif"
+  bool? _wasActive;
+  bool _ringing = false;
+  bool _dismissedThisCall = false; // évite de re-sonner après avoir ignoré
 
   Future<void> _startMeeting() async {
     final room = 'varecia-${DateTime.now().millisecondsSinceEpoch}';
@@ -29,6 +27,7 @@ class _ReunionPageState extends State<ReunionPage> {
   }
 
   Future<void> _join(String room) async {
+    _stopRinging();
     final user = context.read<AuthService>().currentUser;
     final options = JitsiMeetConferenceOptions(
       room: room,
@@ -41,6 +40,18 @@ class _ReunionPageState extends State<ReunionPage> {
       ),
     );
     await _jitsi.join(options);
+  }
+
+  void _stopRinging() {
+    if (_ringing) {
+      SoundService.instance.stopRingtone();
+      setState(() => _ringing = false);
+    }
+  }
+
+  void _dismissCall() {
+    _stopRinging();
+    setState(() => _dismissedThisCall = true);
   }
 
   Future<void> _requestFloor() async {
@@ -64,6 +75,12 @@ class _ReunionPageState extends State<ReunionPage> {
   }
 
   @override
+  void dispose() {
+    SoundService.instance.stopRingtone();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isAdmin = context.watch<AuthService>().isAdmin;
 
@@ -74,14 +91,64 @@ class _ReunionPageState extends State<ReunionPage> {
         final active = meeting['active'] == true;
         final room = meeting['room'] as String?;
 
-        // Notification sonore pour TOUT LE MONDE (pas seulement l'admin)
-        // dès que la réunion passe de "inactive" à "active".
-        if (_wasActive == false && active == true) {
+        // Démarre la sonnerie EN BOUCLE dès que la réunion passe à
+        // "active" (uniquement pour les membres, pas l'admin qui vient
+        // de la démarrer lui-même).
+        if (_wasActive == false && active == true && !isAdmin) {
+          _dismissedThisCall = false;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            SoundService.instance.playSuccess();
+            if (!mounted) return;
+            setState(() => _ringing = true);
+            SoundService.instance.playRingtone();
           });
         }
+        // Arrête la sonnerie si la réunion est terminée entre-temps.
+        if (_wasActive == true && active == false) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _stopRinging());
+        }
         _wasActive = active;
+
+        // Écran plein "appel entrant" tant que la sonnerie tourne.
+        if (_ringing && !_dismissedThisCall && active) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: GlassCard(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.videocam, size: 56, color: Colors.green),
+                    const SizedBox(height: 12),
+                    const Text('Réunion en cours',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18)),
+                    const Text('L\'administrateur vous invite à rejoindre.',
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () => _join(room!),
+                          icon: const Icon(Icons.call),
+                          label: const Text('Rejoindre'),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green),
+                        ),
+                        const SizedBox(width: 12),
+                        OutlinedButton.icon(
+                          onPressed: _dismissCall,
+                          icon: const Icon(Icons.call_end, color: Colors.red),
+                          label: const Text('Ignorer'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
