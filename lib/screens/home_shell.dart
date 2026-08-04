@@ -46,7 +46,7 @@ class _HomeShellState extends State<HomeShell> {
       const _Dest('Bibliothèque', Icons.menu_book_outlined, BibliothequePage(),
           badgeKey: 'library'),
       const _Dest('Réunion', Icons.videocam_outlined, ReunionPage()),
-      const _Dest('Galerie', Icons.photo_library_outlined, GaleriePage(),
+      const _Dest('Actualité', Icons.dynamic_feed_outlined, ActualitePage(),
           badgeKey: 'gallery'),
       const _Dest('Notes', Icons.forum_outlined, SondagePage(),
           badgeKey: 'posts'),
@@ -80,31 +80,42 @@ class _HomeShellState extends State<HomeShell> {
         index: _index,
         children: destinations.map((d) => d.page).toList(),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) {
-          setState(() => _index = i);
-          _markSeenIfNeeded(destinations[i].badgeKey);
-        },
-        destinations: destinations
-            .map((d) => NavigationDestination(
-                  icon: d.badgeKey == null
-                      ? Icon(d.icon)
-                      : StreamBuilder<int>(
-                          stream:
-                              BadgeService.instance.watchUnseenCount(d.badgeKey!),
-                          builder: (context, snap) {
-                            final count = snap.data ?? 0;
-                            return Badge(
-                              isLabelVisible: count > 0,
-                              label: Text('$count'),
-                              child: Icon(d.icon),
-                            );
-                          },
-                        ),
-                  label: d.label,
-                ))
-            .toList(),
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          // Icônes seules, sans texte — résout l'encombrement avec 9 onglets.
+          labelTextStyle: MaterialStateProperty.all(
+            const TextStyle(fontSize: 0, height: 0.01),
+          ),
+        ),
+        child: NavigationBar(
+          height: 58,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+          selectedIndex: _index,
+          onDestinationSelected: (i) {
+            setState(() => _index = i);
+            _markSeenIfNeeded(destinations[i].badgeKey);
+          },
+          destinations: destinations
+              .map((d) => NavigationDestination(
+                    tooltip: d.label, // le nom reste accessible en appui long
+                    icon: d.badgeKey == null
+                        ? Icon(d.icon)
+                        : StreamBuilder<int>(
+                            stream: BadgeService.instance
+                                .watchUnseenCount(d.badgeKey!),
+                            builder: (context, snap) {
+                              final count = snap.data ?? 0;
+                              return Badge(
+                                isLabelVisible: count > 0,
+                                label: Text('$count'),
+                                child: Icon(d.icon),
+                              );
+                            },
+                          ),
+                    label: d.label,
+                  ))
+              .toList(),
+        ),
       ),
     );
   }
