@@ -12,6 +12,7 @@ import 'pages/profil_page.dart';
 import 'pages/admin_page.dart';
 import 'pages/ma_section_page.dart';
 import 'pages/messages_page.dart';
+import 'auth/welcome_screen.dart';
 
 class _Dest {
   final String label;
@@ -34,6 +35,16 @@ class _HomeShellState extends State<HomeShell> {
     if (badgeKey == null) return;
     final data = await FirestoreService.instance.getJSON(badgeKey, []);
     await BadgeService.instance.markSeen(badgeKey, (data as List).length);
+  }
+
+  Future<void> _logout() async {
+    await context.read<AuthService>().logout();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -72,7 +83,7 @@ class _HomeShellState extends State<HomeShell> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Déconnexion',
-            onPressed: () => context.read<AuthService>().logout(),
+            onPressed: _logout,
           ),
         ],
       ),
@@ -82,7 +93,6 @@ class _HomeShellState extends State<HomeShell> {
       ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
-          // Icônes seules, sans texte — résout l'encombrement avec 9 onglets.
           labelTextStyle: MaterialStateProperty.all(
             const TextStyle(fontSize: 0, height: 0.01),
           ),
@@ -97,7 +107,7 @@ class _HomeShellState extends State<HomeShell> {
           },
           destinations: destinations
               .map((d) => NavigationDestination(
-                    tooltip: d.label, // le nom reste accessible en appui long
+                    tooltip: d.label,
                     icon: d.badgeKey == null
                         ? Icon(d.icon)
                         : StreamBuilder<int>(
