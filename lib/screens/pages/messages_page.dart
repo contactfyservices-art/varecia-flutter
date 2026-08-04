@@ -4,6 +4,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/user_avatar.dart';
+import '../../widgets/online_dot.dart';
 import 'chat_page.dart';
 
 class MessagesPage extends StatefulWidget {
@@ -101,15 +102,30 @@ class _MessagesPageState extends State<MessagesPage> {
                       child: GlassCard(
                         padding: EdgeInsets.zero,
                         child: ListTile(
-                          leading: UserAvatar(
-                            email: m['email'] ?? '',
-                            fallbackName: m['prenom'] ?? '?',
+                          leading: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              UserAvatar(
+                                email: m['email'] ?? '',
+                                fallbackName: m['prenom'] ?? '?',
+                              ),
+                              Positioned(
+                                bottom: -1,
+                                right: -1,
+                                child: OnlineDot(email: m['email'] ?? ''),
+                              ),
+                            ],
                           ),
                           title: Text('${m['prenom']} ${m['nom']}'),
-                          subtitle: Text(m['section'] != null &&
-                                  m['section'].toString().isNotEmpty
-                              ? 'Section ${m['section']} · ${m['email']}'
-                              : m['email'] ?? ''),
+                          subtitle: Row(
+                            children: [
+                              if (m['section'] != null &&
+                                  m['section'].toString().isNotEmpty)
+                                Text('Section ${m['section']} · ',
+                                    style: const TextStyle(fontSize: 11)),
+                              OnlineLabel(email: m['email'] ?? ''),
+                            ],
+                          ),
                           onTap: () {
                             Navigator.push(
                               context,
