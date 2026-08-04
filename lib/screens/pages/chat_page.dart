@@ -64,6 +64,9 @@ class _ChatPageState extends State<ChatPage> {
                   .watchConversation(user.email, widget.peerEmail),
               builder: (context, snapshot) {
                 final messages = snapshot.data ?? [];
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
                 if (messages.isEmpty) {
                   return const Center(
                     child: Text('Aucun message pour le moment. Dis bonjour !',
