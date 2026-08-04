@@ -7,6 +7,8 @@ import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/admin_badge.dart';
+import '../../widgets/fade_slide_in.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class SondagePage extends StatefulWidget {
   const SondagePage({super.key});
@@ -111,77 +113,85 @@ class _SondagePageState extends State<SondagePage> {
               ),
               const SizedBox(height: 16),
               if (!snapshot.hasData)
-                const Center(child: CircularProgressIndicator())
+                const ShimmerList()
               else if (posts.isEmpty)
                 const Text('Aucune note pour le moment.',
                     style: TextStyle(color: Colors.grey)),
-              for (final p in posts)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: GlassCard(
-                    child: Builder(builder: (context) {
-                      final author = p['author'] ?? '';
-                      final authorEmail = p['authorEmail'] ?? '';
-                      final canEdit = isAdmin || authorEmail == user?.email;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              UserAvatar(
-                                  email: authorEmail,
-                                  fallbackName: author,
-                                  radius: 14),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(author,
-                                              overflow:
-                                                  TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold)),
-                                        ),
-                                        AdminBadge(authorEmail: authorEmail),
-                                      ],
-                                    ),
-                                    Text(p['date'] ?? '',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(p['text'] ?? ''),
-                          if (canEdit) ...[
-                            const SizedBox(height: 6),
+              for (int i = 0; i < posts.length; i++)
+                FadeSlideIn(
+                  index: i,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: GlassCard(
+                      child: Builder(builder: (context) {
+                        final p = posts[i];
+                        final author = p['author'] ?? '';
+                        final authorEmail = p['authorEmail'] ?? '';
+                        final canEdit =
+                            isAdmin || authorEmail == user?.email;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Row(
                               children: [
-                                TextButton(
-                                  onPressed: () =>
-                                      _edit(p['id'], p['text'] ?? ''),
-                                  child: const Text('Modifier'),
-                                ),
-                                TextButton(
-                                  onPressed: () => _confirmDelete(p['id']),
-                                  child: const Text('Supprimer',
-                                      style: TextStyle(color: Colors.red)),
+                                UserAvatar(
+                                    email: authorEmail,
+                                    fallbackName: author,
+                                    radius: 14),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(author,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.bold)),
+                                          ),
+                                          AdminBadge(
+                                              authorEmail: authorEmail),
+                                        ],
+                                      ),
+                                      Text(p['date'] ?? '',
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey)),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 6),
+                            Text(p['text'] ?? ''),
+                            if (canEdit) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        _edit(p['id'], p['text'] ?? ''),
+                                    child: const Text('Modifier'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        _confirmDelete(p['id']),
+                                    child: const Text('Supprimer',
+                                        style:
+                                            TextStyle(color: Colors.red)),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
-                      );
-                    }),
+                        );
+                      }),
+                    ),
                   ),
                 ),
             ],
