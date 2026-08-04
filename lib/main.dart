@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
@@ -8,6 +9,7 @@ import 'services/firestore_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth/welcome_screen.dart';
 import 'screens/home_shell.dart';
+import 'screens/onboarding_screen.dart';
 
 const int kCurrentAppVersion = 1; // à augmenter manuellement à chaque nouveau build
 
@@ -43,10 +45,25 @@ class _SplashGate extends StatefulWidget {
 }
 
 class _SplashGateState extends State<_SplashGate> {
+  bool _checkingOnboarding = true;
+  bool _showOnboarding = false;
+
   @override
   void initState() {
     super.initState();
-    _restore();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('onboarding_seen') ?? false;
+    setState(() {
+      _showOnboarding = !seen;
+      _checkingOnboarding = false;
+    });
+    if (!_showOnboarding) {
+      _restore();
+    }
   }
 
   Future<void> _restore() async {
@@ -92,6 +109,19 @@ class _SplashGateState extends State<_SplashGate> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingOnboarding) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_showOnboarding) {
+      return OnboardingScreen(
+        onDone: () {
+          setState(() => _showOnboarding = false);
+          _restore();
+        },
+      );
+    }
+
     final auth = context.watch<AuthService>();
     if (!auth.sessionLoaded) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
