@@ -5,6 +5,8 @@ import '../../services/firestore_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/online_dot.dart';
+import '../../widgets/fade_slide_in.dart';
+import '../../widgets/shimmer_loading.dart';
 import 'chat_page.dart';
 
 class MessagesPage extends StatefulWidget {
@@ -41,7 +43,10 @@ class _MessagesPageState extends State<MessagesPage> {
           );
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: ShimmerList(),
+          );
         }
 
         final allUsers = (snapshot.data ?? []) as List;
@@ -96,47 +101,53 @@ class _MessagesPageState extends State<MessagesPage> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-                  for (final m in others)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: GlassCard(
-                        padding: EdgeInsets.zero,
-                        child: ListTile(
-                          leading: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              UserAvatar(
-                                email: m['email'] ?? '',
-                                fallbackName: m['prenom'] ?? '?',
-                              ),
-                              Positioned(
-                                bottom: -1,
-                                right: -1,
-                                child: OnlineDot(email: m['email'] ?? ''),
-                              ),
-                            ],
-                          ),
-                          title: Text('${m['prenom']} ${m['nom']}'),
-                          subtitle: Row(
-                            children: [
-                              if (m['section'] != null &&
-                                  m['section'].toString().isNotEmpty)
-                                Text('Section ${m['section']} · ',
-                                    style: const TextStyle(fontSize: 11)),
-                              OnlineLabel(email: m['email'] ?? ''),
-                            ],
-                          ),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChatPage(
-                                  peerEmail: m['email'],
-                                  peerName: '${m['prenom']} ${m['nom']}',
+                  for (int i = 0; i < others.length; i++)
+                    FadeSlideIn(
+                      index: i,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: GlassCard(
+                          padding: EdgeInsets.zero,
+                          child: ListTile(
+                            leading: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                UserAvatar(
+                                  email: others[i]['email'] ?? '',
+                                  fallbackName: others[i]['prenom'] ?? '?',
                                 ),
-                              ),
-                            );
-                          },
+                                Positioned(
+                                  bottom: -1,
+                                  right: -1,
+                                  child: OnlineDot(
+                                      email: others[i]['email'] ?? ''),
+                                ),
+                              ],
+                            ),
+                            title:
+                                Text('${others[i]['prenom']} ${others[i]['nom']}'),
+                            subtitle: Row(
+                              children: [
+                                if (others[i]['section'] != null &&
+                                    others[i]['section'].toString().isNotEmpty)
+                                  Text('Section ${others[i]['section']} · ',
+                                      style: const TextStyle(fontSize: 11)),
+                                OnlineLabel(email: others[i]['email'] ?? ''),
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatPage(
+                                    peerEmail: others[i]['email'],
+                                    peerName:
+                                        '${others[i]['prenom']} ${others[i]['nom']}',
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
