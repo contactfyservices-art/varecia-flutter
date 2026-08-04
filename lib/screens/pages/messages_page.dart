@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/user_avatar.dart';
 import 'chat_page.dart';
 
 class MessagesPage extends StatefulWidget {
@@ -12,17 +13,36 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
-  String _filter = 'Tous'; // 'Tous' | 'A' | 'B' | 'C'
+  String _filter = 'Tous';
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthService>().currentUser;
     final fs = FirestoreService.instance;
-    if (user == null) return const SizedBox();
+
+    if (user == null) {
+      return const Center(
+        child: Text('Session non chargée. Reviens sur cet onglet dans un instant.',
+            textAlign: TextAlign.center),
+      );
+    }
 
     return StreamBuilder(
       stream: fs.watchJSON('users', []),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('Erreur de chargement : ${snapshot.error}',
+                  textAlign: TextAlign.center),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
         final allUsers = (snapshot.data ?? []) as List;
         var others = allUsers
             .where((u) =>
@@ -40,7 +60,6 @@ class _MessagesPageState extends State<MessagesPage> {
               child: Text('Messages',
                   style: Theme.of(context).textTheme.titleLarge),
             ),
-            // Filtre par section — toujours visible en haut de la page.
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: SingleChildScrollView(
@@ -66,10 +85,15 @@ class _MessagesPageState extends State<MessagesPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
                   if (others.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 20),
-                      child: Text('Aucun membre trouvé pour ce filtre.',
-                          style: TextStyle(color: Colors.grey)),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: Text(
+                        allUsers.length <= 1
+                            ? 'Aucun autre membre inscrit pour le moment dans l\'appli.'
+                            : 'Aucun membre trouvé pour ce filtre.',
+                        style: const TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   for (final m in others)
                     Padding(
@@ -77,11 +101,9 @@ class _MessagesPageState extends State<MessagesPage> {
                       child: GlassCard(
                         padding: EdgeInsets.zero,
                         child: ListTile(
-                          leading: CircleAvatar(
-                            child: Text((m['prenom'] ?? '?')
-                                .toString()
-                                .substring(0, 1)
-                                .toUpperCase()),
+                          leading: UserAvatar(
+                            email: m['email'] ?? '',
+                            fallbackName: m['prenom'] ?? '?',
                           ),
                           title: Text('${m['prenom']} ${m['nom']}'),
                           subtitle: Text(m['section'] != null &&
