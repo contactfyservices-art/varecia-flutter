@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Placeholder de chargement animé (effet "vague lumineuse") à utiliser
-/// à la place d'un simple CircularProgressIndicator — donne une
-/// impression de fluidité et de modernité pendant que Firestore charge.
 class ShimmerLoading extends StatefulWidget {
   final double height;
   final double borderRadius;
@@ -56,8 +53,6 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
   }
 }
 
-/// Colonne de 3 placeholders — pratique pour remplacer un
-/// CircularProgressIndicator seul en attendant une liste Firestore.
 class ShimmerList extends StatelessWidget {
   const ShimmerList({super.key});
   @override
