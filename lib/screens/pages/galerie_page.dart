@@ -9,6 +9,8 @@ import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/admin_badge.dart';
+import '../../widgets/fade_slide_in.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class ActualitePage extends StatefulWidget {
   const ActualitePage({super.key});
@@ -231,29 +233,30 @@ class _ActualitePageState extends State<ActualitePage> {
               ),
               const SizedBox(height: 12),
               if (!snapshot.hasData)
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(child: CircularProgressIndicator()),
-                )
+                const ShimmerList()
               else if (items.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Text('Aucune publication pour le moment.',
                       style: TextStyle(color: Colors.grey)),
                 ),
-              for (final it in items)
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: _PostCard(
-                    data: it,
-                    userEmail: user?.email,
-                    canEdit: isAdmin || it['authorEmail'] == user?.email,
-                    onLike: () =>
-                        _toggleLike(it['id'], it['likes'] ?? [], user?.email ?? ''),
-                    onComment: () =>
-                        _openComments(it['id'], it['comments'] ?? [], user),
-                    onDelete: () => _confirmDelete(it['id']),
+              for (int i = 0; i < items.length; i++)
+                FadeSlideIn(
+                  index: i,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    child: _PostCard(
+                      data: items[i],
+                      userEmail: user?.email,
+                      canEdit: isAdmin ||
+                          items[i]['authorEmail'] == user?.email,
+                      onLike: () => _toggleLike(items[i]['id'],
+                          items[i]['likes'] ?? [], user?.email ?? ''),
+                      onComment: () => _openComments(
+                          items[i]['id'], items[i]['comments'] ?? [], user),
+                      onDelete: () => _confirmDelete(items[i]['id']),
+                    ),
                   ),
                 ),
             ],
