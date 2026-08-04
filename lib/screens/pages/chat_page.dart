@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/messaging_service.dart';
 import '../../services/sound_service.dart';
+import '../../widgets/user_avatar.dart';
 
 class ChatPage extends StatefulWidget {
   final String peerEmail;
@@ -46,7 +47,15 @@ class _ChatPageState extends State<ChatPage> {
     if (user == null) return const SizedBox();
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.peerName)),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            UserAvatar(email: widget.peerEmail, fallbackName: widget.peerName, radius: 16),
+            const SizedBox(width: 10),
+            Text(widget.peerName),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -74,45 +83,59 @@ class _ChatPageState extends State<ChatPage> {
                     final m = messages[i];
                     final isMe = m['from'] == user.email;
                     final time = DateTime.tryParse(m['date'] ?? '');
-                    return Align(
-                      alignment: isMe
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        constraints: BoxConstraints(
-                            maxWidth:
-                                MediaQuery.of(context).size.width * 0.72),
-                        decoration: BoxDecoration(
-                          color: isMe
-                              ? Theme.of(context).colorScheme.primary
-                              : Colors.grey.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(m['text'] ?? '',
-                                style: TextStyle(
-                                    color: isMe ? Colors.white : null)),
-                            if (time != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(
-                                  DateFormat('HH:mm').format(time),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: isMe
-                                        ? Colors.white70
-                                        : Colors.grey,
-                                  ),
-                                ),
-                              ),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: isMe
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (!isMe) ...[
+                            UserAvatar(
+                                email: widget.peerEmail,
+                                fallbackName: widget.peerName,
+                                radius: 12),
+                            const SizedBox(width: 6),
                           ],
-                        ),
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.of(context).size.width * 0.68),
+                              decoration: BoxDecoration(
+                                color: isMe
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.grey.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(m['text'] ?? '',
+                                      style: TextStyle(
+                                          color: isMe ? Colors.white : null)),
+                                  if (time != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        DateFormat('HH:mm').format(time),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isMe
+                                              ? Colors.white70
+                                              : Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },
