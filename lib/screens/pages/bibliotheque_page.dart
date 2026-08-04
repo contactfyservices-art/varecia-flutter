@@ -19,7 +19,9 @@ class _BibliothequePageState extends State<BibliothequePage> {
   final _fs = FirestoreService.instance;
   final _titleCtrl = TextEditingController();
   final _linkCtrl = TextEditingController();
+  final _searchCtrl = TextEditingController();
   PlatformFile? _pickedFile;
+  String _search = '';
 
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
@@ -118,7 +120,16 @@ class _BibliothequePageState extends State<BibliothequePage> {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _fs.watchItems('library_items'),
       builder: (context, snapshot) {
-        final items = snapshot.data ?? [];
+        final allItems = snapshot.data ?? [];
+        // Filtre de recherche — insensible à la casse, sur le titre.
+        final items = _search.isEmpty
+            ? allItems
+            : allItems
+                .where((it) => (it['title'] ?? '')
+                    .toString()
+                    .toLowerCase()
+                    .contains(_search.toLowerCase()))
+                .toList();
 
         return RefreshIndicator(
           onRefresh: () async => setState(() {}),
@@ -130,6 +141,27 @@ class _BibliothequePageState extends State<BibliothequePage> {
               const SizedBox(height: 6),
               const Text(
                   'Ouverte à tous : chacun peut ajouter une ressource et consulter les autres.'),
+              const SizedBox(height: 12),
+              // Barre de recherche
+              TextField(
+                controller: _searchCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Rechercher une ressource par titre...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _search.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _search = '');
+                          },
+                        ),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onChanged: (v) => setState(() => _search = v),
+              ),
               const SizedBox(height: 16),
               GlassCard(
                 child: Column(
@@ -186,8 +218,12 @@ class _BibliothequePageState extends State<BibliothequePage> {
               if (!snapshot.hasData)
                 const Center(child: CircularProgressIndicator())
               else if (items.isEmpty)
-                const Text('Aucune ressource pour le moment.',
-                    style: TextStyle(color: Colors.grey)),
+                Text(
+                  _search.isEmpty
+                      ? 'Aucune ressource pour le moment.'
+                      : 'Aucun résultat pour "$_search".',
+                  style: const TextStyle(color: Colors.grey),
+                ),
               for (final it in items)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
