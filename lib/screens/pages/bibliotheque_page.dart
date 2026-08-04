@@ -8,6 +8,8 @@ import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/admin_badge.dart';
+import '../../widgets/fade_slide_in.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class BibliothequePage extends StatefulWidget {
   const BibliothequePage({super.key});
@@ -121,7 +123,6 @@ class _BibliothequePageState extends State<BibliothequePage> {
       stream: _fs.watchItems('library_items'),
       builder: (context, snapshot) {
         final allItems = snapshot.data ?? [];
-        // Filtre de recherche — insensible à la casse, sur le titre.
         final items = _search.isEmpty
             ? allItems
             : allItems
@@ -142,7 +143,6 @@ class _BibliothequePageState extends State<BibliothequePage> {
               const Text(
                   'Ouverte à tous : chacun peut ajouter une ressource et consulter les autres.'),
               const SizedBox(height: 12),
-              // Barre de recherche
               TextField(
                 controller: _searchCtrl,
                 decoration: InputDecoration(
@@ -175,7 +175,8 @@ class _BibliothequePageState extends State<BibliothequePage> {
                     TextField(
                       controller: _linkCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'Lien Google Drive (recommandé pour les gros fichiers)',
+                        labelText:
+                            'Lien Google Drive (recommandé pour les gros fichiers)',
                         helperText: 'Astuce : partage ton fichier sur Drive avec '
                             '"Tout le monde avec le lien", puis colle le lien ici — '
                             'aucune limite de taille.',
@@ -216,7 +217,7 @@ class _BibliothequePageState extends State<BibliothequePage> {
               ),
               const SizedBox(height: 16),
               if (!snapshot.hasData)
-                const Center(child: CircularProgressIndicator())
+                const ShimmerList()
               else if (items.isEmpty)
                 Text(
                   _search.isEmpty
@@ -224,97 +225,107 @@ class _BibliothequePageState extends State<BibliothequePage> {
                       : 'Aucun résultat pour "$_search".',
                   style: const TextStyle(color: Colors.grey),
                 ),
-              for (final it in items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: GlassCard(
-                    child: Builder(builder: (context) {
-                      final title = it['title'] ?? '';
-                      final author = it['author'] ?? '';
-                      final authorEmail = it['authorEmail'] ?? '';
-                      final link = it['link'] as String?;
-                      final fileName = it['fileName'] as String?;
-                      final canEdit =
-                          isAdmin || authorEmail == user?.email;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              UserAvatar(
-                                  email: authorEmail,
-                                  fallbackName: author,
-                                  radius: 14),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text('Ajouté par $author',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey)),
-                                    ),
-                                    AdminBadge(authorEmail: authorEmail),
-                                  ],
+              for (int i = 0; i < items.length; i++)
+                FadeSlideIn(
+                  index: i,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: GlassCard(
+                      child: Builder(builder: (context) {
+                        final it = items[i];
+                        final title = it['title'] ?? '';
+                        final author = it['author'] ?? '';
+                        final authorEmail = it['authorEmail'] ?? '';
+                        final link = it['link'] as String?;
+                        final fileName = it['fileName'] as String?;
+                        final canEdit =
+                            isAdmin || authorEmail == user?.email;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                UserAvatar(
+                                    email: authorEmail,
+                                    fallbackName: author,
+                                    radius: 14),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text('Ajouté par $author',
+                                            overflow:
+                                                TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey)),
+                                      ),
+                                      AdminBadge(
+                                          authorEmail: authorEmail),
+                                    ],
+                                  ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(title,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                            if (link != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.link, size: 14),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(link,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            color: Colors.blue,
+                                            decoration: TextDecoration
+                                                .underline)),
+                                  ),
+                                ],
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(title,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                          if (link != null) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.link, size: 14),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(link,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          color: Colors.blue,
-                                          decoration:
-                                              TextDecoration.underline)),
-                                ),
-                              ],
-                            ),
+                            if (fileName != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.insert_drive_file,
+                                      size: 14),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                      child: Text(fileName,
+                                          overflow:
+                                              TextOverflow.ellipsis)),
+                                ],
+                              ),
+                            ],
+                            if (canEdit) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        _editTitle(it['id'], title),
+                                    child: const Text('Modifier'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        _confirmDelete(it['id']),
+                                    child: const Text('Supprimer',
+                                        style: TextStyle(
+                                            color: Colors.red)),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                          if (fileName != null) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.insert_drive_file, size: 14),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                    child: Text(fileName,
-                                        overflow: TextOverflow.ellipsis)),
-                              ],
-                            ),
-                          ],
-                          if (canEdit) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                TextButton(
-                                  onPressed: () =>
-                                      _editTitle(it['id'], title),
-                                  child: const Text('Modifier'),
-                                ),
-                                TextButton(
-                                  onPressed: () => _confirmDelete(it['id']),
-                                  child: const Text('Supprimer',
-                                      style: TextStyle(color: Colors.red)),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      );
-                    }),
+                        );
+                      }),
+                    ),
                   ),
                 ),
             ],
