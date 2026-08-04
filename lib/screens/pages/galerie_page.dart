@@ -9,13 +9,13 @@ import '../../services/firestore_service.dart';
 import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
 
-class GaleriePage extends StatefulWidget {
-  const GaleriePage({super.key});
+class ActualitePage extends StatefulWidget {
+  const ActualitePage({super.key});
   @override
-  State<GaleriePage> createState() => _GaleriePageState();
+  State<ActualitePage> createState() => _ActualitePageState();
 }
 
-class _GaleriePageState extends State<GaleriePage> {
+class _ActualitePageState extends State<ActualitePage> {
   final _fs = FirestoreService.instance;
   final _captionCtrl = TextEditingController();
 
@@ -49,7 +49,7 @@ class _GaleriePageState extends State<GaleriePage> {
       SoundService.instance.playSuccess();
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Photo publiée !')));
+            .showSnackBar(const SnackBar(content: Text('Publié !')));
       }
     } catch (e) {
       if (!mounted) return;
@@ -196,42 +196,42 @@ class _GaleriePageState extends State<GaleriePage> {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text('Albums photos',
+                child: Text('Actualité',
                     style: Theme.of(context).textTheme.titleLarge),
               ),
               const SizedBox(height: 12),
-              if (isAdmin)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: GlassCard(
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _captionCtrl,
-                          decoration: const InputDecoration(labelText: 'Légende'),
+              // Tout le monde peut publier — plus réservé à l'admin.
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: GlassCard(
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _captionCtrl,
+                        decoration: const InputDecoration(labelText: 'Légende'),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            if (user == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text(
+                                          'Session non chargée — réessaie dans un instant.')));
+                              return;
+                            }
+                            _addPhoto(user);
+                          },
+                          icon: const Icon(Icons.add_a_photo),
+                          label: const Text('Publier une photo'),
                         ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              if (user == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Session non chargée — réessaie dans un instant.')));
-                                return;
-                              }
-                              _addPhoto(user);
-                            },
-                            icon: const Icon(Icons.add_a_photo),
-                            label: const Text('Publier une photo'),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
               const SizedBox(height: 12),
               if (items.isEmpty)
                 const Padding(
