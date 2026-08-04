@@ -20,7 +20,35 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _error;
   bool _done = false;
 
+  static final _emailRegex =
+      RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+
+  /// Vérifie les champs avant d'appeler Firestore — retourne un message
+  /// d'erreur clair si quelque chose est invalide, sinon null.
+  String? _validate() {
+    if (_prenom.text.trim().isEmpty || _nom.text.trim().isEmpty) {
+      return 'Merci de renseigner ton prénom et ton nom.';
+    }
+    if (!_emailRegex.hasMatch(_email.text.trim())) {
+      return 'Adresse e-mail invalide (exemple : nom@exemple.com).';
+    }
+    if (_password.text.length < 6) {
+      return 'Le mot de passe doit contenir au moins 6 caractères.';
+    }
+    if (_niveau.text.trim().isEmpty) {
+      return 'Merci de renseigner ton niveau / matricule.';
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
+    final validationError = _validate();
+    if (validationError != null) {
+      setState(() => _error = validationError);
+      SoundService.instance.playError();
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -80,15 +108,19 @@ class _SignupScreenState extends State<SignupScreen> {
                       TextField(
                         controller: _email,
                         keyboardType: TextInputType.emailAddress,
-                        decoration:
-                            const InputDecoration(labelText: 'Adresse e-mail'),
+                        decoration: const InputDecoration(
+                          labelText: 'Adresse e-mail',
+                          hintText: 'exemple@gmail.com',
+                        ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: _password,
                         obscureText: true,
-                        decoration:
-                            const InputDecoration(labelText: 'Mot de passe'),
+                        decoration: const InputDecoration(
+                          labelText: 'Mot de passe',
+                          helperText: 'Au moins 6 caractères',
+                        ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
@@ -99,7 +131,8 @@ class _SignupScreenState extends State<SignupScreen> {
                       if (_error != null) ...[
                         const SizedBox(height: 10),
                         Text(_error!,
-                            style: const TextStyle(color: Colors.red)),
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center),
                       ],
                       const SizedBox(height: 20),
                       SizedBox(
