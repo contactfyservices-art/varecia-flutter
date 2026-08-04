@@ -1,45 +1,81 @@
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
-/// Réplique la logique getJSON/setJSON de la version HTML : chaque "clé"
-/// (users, posts, gallery, library, meeting, adminCode, appVersion, logo...)
-/// correspond à un document de la collection `app_data`, avec un champ
-/// `value` contenant le JSON encodé — exactement le même format que
-/// l'ancienne version web, pour rester compatible avec les données déjà
-/// créées dans Firestore.
+/// Service d'accès à Firestore. Conserve les méthodes historiques
+/// getJSON/setJSON/watchJSON (documents uniques, utilisées par users,
+/// admins, adminCode, meeting, appVersion, content_accueil, conv_*)
+/// ET ajoute de nouvelles méthodes basées sur des SOUS-COLLECTIONS
+/// pour tout ce qui grossit sans limite (galerie, notes, bibliothèque)
+/// — chaque élément devient son propre petit document au lieu d'un
+/// tableau géant, ce qui évite la limite de 1 Mo par document Firestore.
 class FirestoreService {
   FirestoreService._();
   static final instance = FirestoreService._();
 
   final _db = FirebaseFirestore.instance;
-  CollectionReference get _appData => _db.collection('app_data');
+  DocumentReference get _root => _db.collection('app_data').doc('main');
 
+  // === Ancien système (document unique, tableau JSON) — inchangé ===
   Future<dynamic> getJSON(String key, dynamic fallback) async {
-    try {
-      final doc = await _appData.doc(key).get();
-      if (!doc.exists) return fallback;
-      final data = doc.data() as Map<String, dynamic>?;
-      final raw = data?['value'];
-      if (raw == null) return fallback;
-      return jsonDecode(raw);
-    } catch (e) {
-      return fallback;
+    final snap = await _root.get();
+    final data = snap.data() as Map<String, dynamic>?;
+    if (data == null || !data.containsKey(key)) return fallback;
+    final raw = data[key];
+    if (raw is String) {
+      try {
+        return jsonDecode(raw);
+      } catch (_) {
+        return fallback;
+      }
     }
+    return raw ?? fallback;
   }
 
   Future<void> setJSON(String key, dynamic value) async {
-    await _appData.doc(key).set({'value': jsonEncode(value)});
+    await _root.set({key: value}, SetOptions(merge: true));
   }
 
-  /// Écoute en temps réel un document — pratique pour les écrans qui
-  /// doivent se rafraîchir automatiquement (réunion active, nouveaux posts...)
   Stream<dynamic> watchJSON(String key, dynamic fallback) {
-    return _appData.doc(key).snapshots().map((doc) {
-      if (!doc.exists) return fallback;
-      final data = doc.data() as Map<String, dynamic>?;
-      final raw = data?['value'];
-      if (raw == null) return fallback;
-      return jsonDecode(raw);
+    return _root.snapshots().map((snap) {
+      final data = snap.data() as Map<String, dynamic>?;
+      if (data == null || !data.containsKey(key)) return fallback;
+      return data[key] ?? fallback;
     });
+  }
+
+  // === Nouveau système (sous-collection, un document par élément) ===
+  CollectionReference _col(String name) =>
+      _db.collection('app_data').doc('main').collection(name);
+
+  /// Ajoute un nouvel élément (photo, note, ressource...) comme document
+  /// individuel — retourne son identifiant Firestore.
+  Future<String> addItem(String collectionName, Map<String, dynamic> data) async {
+    final doc = await _col(collectionName).add({
+      ...data,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return doc.id;
+  }
+
+  Future<void> updateItem(
+      String collectionName, String docId, Map<String, dynamic> data) async {
+    await _col(collectionName).doc(docId).update(data);
+  }
+
+  Future<void> deleteItem(String collectionName, String docId) async {
+    await _col(collectionName).doc(docId).delete();
+  }
+
+  /// Flux des éléments les plus récents en premier, avec leur id Firestore
+  /// inclus sous la clé 'id' de chaque map.
+  Stream<List<Map<String, dynamic>>> watchItems(String collectionName) {
+    return _col(collectionName)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) {
+              final map = Map<String, dynamic>.from(d.data() as Map);
+              map['id'] = d.id;
+              return map;
+            }).toList());
   }
 }
