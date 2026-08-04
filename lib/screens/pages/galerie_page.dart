@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/user_avatar.dart';
 
 class ActualitePage extends StatefulWidget {
   const ActualitePage({super.key});
@@ -117,6 +118,11 @@ class _ActualitePageState extends State<ActualitePage> {
                               final c = it.comments[i];
                               return ListTile(
                                 dense: true,
+                                leading: UserAvatar(
+                                  email: c['authorEmail'] ?? '',
+                                  fallbackName: c['author'] ?? '?',
+                                  radius: 12,
+                                ),
                                 title: Text(c['author'] ?? '',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold, fontSize: 13)),
@@ -187,6 +193,9 @@ class _ActualitePageState extends State<ActualitePage> {
       stream: _fs.watchJSON('gallery', []),
       builder: (context, snapshot) {
         final rawItems = (snapshot.data ?? []) as List;
+        // Tri du plus récent en premier — l'ordre d'ajout dans Firestore
+        // est chronologique croissant, donc .reversed met le dernier
+        // publié tout en haut du fil.
         final items = rawItems.asMap().entries.toList().reversed.toList();
 
         return RefreshIndicator(
@@ -200,7 +209,6 @@ class _ActualitePageState extends State<ActualitePage> {
                     style: Theme.of(context).textTheme.titleLarge),
               ),
               const SizedBox(height: 12),
-              // Tout le monde peut publier — plus réservé à l'admin.
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: GlassCard(
@@ -297,12 +305,7 @@ class _PostCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 16,
-                  child: Text(item.author.isNotEmpty
-                      ? item.author[0].toUpperCase()
-                      : '?'),
-                ),
+                UserAvatar(email: item.authorEmail, fallbackName: item.author),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(item.author,
