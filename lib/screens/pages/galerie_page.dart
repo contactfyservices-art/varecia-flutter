@@ -3,12 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import '../../models/models.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/user_avatar.dart';
+import '../../widgets/admin_badge.dart';
 
 class ActualitePage extends StatefulWidget {
   const ActualitePage({super.key});
@@ -20,32 +20,29 @@ class _ActualitePageState extends State<ActualitePage> {
   final _fs = FirestoreService.instance;
   final _captionCtrl = TextEditingController();
 
-  Future<void> _addPhoto(AppUser user) async {
+  Future<void> _addPhoto(dynamic user) async {
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
           source: ImageSource.gallery, imageQuality: 70, maxWidth: 1000);
       if (picked == null) return;
       final bytes = await File(picked.path).readAsBytes();
-      if (bytes.lengthInBytes > 4.5 * 1024 * 1024) {
+      if (bytes.lengthInBytes > 900 * 1024) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Image trop volumineuse (max ~4,5 Mo).')));
+            content: Text('Image trop volumineuse (max ~900 Ko après compression).')));
         return;
       }
       final b64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
-      final items = await _fs.getJSON('gallery', []) as List;
-      items.add(GalleryItem(
-        index: items.length,
-        image: b64,
-        caption: _captionCtrl.text.trim(),
-        author: user.fullName,
-        authorEmail: user.email,
-        likes: [],
-        comments: [],
-      ).toMap());
-      await _fs.setJSON('gallery', items);
+      await _fs.addItem('gallery_items', {
+        'image': b64,
+        'caption': _captionCtrl.text.trim(),
+        'author': user.fullName,
+        'authorEmail': user.email,
+        'likes': <String>[],
+        'comments': <Map<String, dynamic>>[],
+      });
       _captionCtrl.clear();
       SoundService.instance.playSuccess();
       if (mounted) {
@@ -59,27 +56,36 @@ class _ActualitePageState extends State<ActualitePage> {
     }
   }
 
-  Future<void> _toggleLike(int index, String email) async {
-    try {
-      final items = await _fs.getJSON('gallery', []) as List;
-      final likes = List<String>.from(items[index]['likes'] ?? []);
-      likes.contains(email) ? likes.remove(email) : likes.add(email);
-      items[index]['likes'] = likes;
-      await _fs.setJSON('gallery', items);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+  Future<void> _toggleLike(String docId, List likes, String email) async {
+    final updated = List<String>.from(likes);
+    updated.contains(email) ? updated.remove(email) : updated.add(email);
+    await _fs.updateItem('gallery_items', docId, {'likes': updated});
+  }
+
+  Future<void> _confirmDelete(String docId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer cette publication ?'),
+        content: const Text('Cette action est définitive.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Supprimer',
+                  style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await _fs.deleteItem('gallery_items', docId);
     }
   }
 
-  Future<void> _delete(int index) async {
-    final items = await _fs.getJSON('gallery', []) as List;
-    items.removeAt(index);
-    await _fs.setJSON('gallery', items);
-  }
-
-  Future<void> _openComments(int index, GalleryItem it, AppUser? user) async {
+  Future<void> _openComments(
+      String docId, List comments, dynamic user) async {
     final ctrl = TextEditingController();
     await showModalBottomSheet(
       context: context,
@@ -97,6 +103,7 @@ class _ActualitePageState extends State<ActualitePage> {
           child: GlassCard(
             borderRadius: 0,
             child: StatefulBuilder(builder: (ctx, setSheetState) {
+              var localComments = List<Map<String, dynamic>>.from(comments);
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +112,7 @@ class _ActualitePageState extends State<ActualitePage> {
                   const SizedBox(height: 8),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 260),
-                    child: it.comments.isEmpty
+                    child: localComments.isEmpty
                         ? const Padding(
                             padding: EdgeInsets.symmetric(vertical: 12),
                             child: Text('Aucun commentaire pour le moment.',
@@ -113,9 +120,9 @@ class _ActualitePageState extends State<ActualitePage> {
                           )
                         : ListView.builder(
                             shrinkWrap: true,
-                            itemCount: it.comments.length,
+                            itemCount: localComments.length,
                             itemBuilder: (_, i) {
-                              final c = it.comments[i];
+                              final c = localComments[i];
                               return ListTile(
                                 dense: true,
                                 leading: UserAvatar(
@@ -147,30 +154,16 @@ class _ActualitePageState extends State<ActualitePage> {
                             ? null
                             : () async {
                                 if (ctrl.text.trim().isEmpty) return;
-                                try {
-                                  final items =
-                                      await _fs.getJSON('gallery', []) as List;
-                                  final comments =
-                                      List<Map<String, dynamic>>.from(
-                                          items[index]['comments'] ?? []);
-                                  comments.add({
-                                    'author': user.fullName,
-                                    'authorEmail': user.email,
-                                    'text': ctrl.text.trim(),
-                                  });
-                                  items[index]['comments'] = comments;
-                                  await _fs.setJSON('gallery', items);
-                                  SoundService.instance.playSuccess();
-                                  ctrl.clear();
-                                  setSheetState(() {
-                                    it.comments
-                                      ..clear()
-                                      ..addAll(comments);
-                                  });
-                                } catch (e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Erreur : $e')));
-                                }
+                                localComments.add({
+                                  'author': user.fullName,
+                                  'authorEmail': user.email,
+                                  'text': ctrl.text.trim(),
+                                });
+                                await _fs.updateItem('gallery_items', docId,
+                                    {'comments': localComments});
+                                SoundService.instance.playSuccess();
+                                ctrl.clear();
+                                setSheetState(() {});
                               },
                       ),
                     ],
@@ -189,14 +182,10 @@ class _ActualitePageState extends State<ActualitePage> {
     final user = context.watch<AuthService>().currentUser;
     final isAdmin = context.watch<AuthService>().isAdmin;
 
-    return StreamBuilder(
-      stream: _fs.watchJSON('gallery', []),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _fs.watchItems('gallery_items'),
       builder: (context, snapshot) {
-        final rawItems = (snapshot.data ?? []) as List;
-        // Tri du plus récent en premier — l'ordre d'ajout dans Firestore
-        // est chronologique croissant, donc .reversed met le dernier
-        // publié tout en haut du fil.
-        final items = rawItems.asMap().entries.toList().reversed.toList();
+        final items = snapshot.data ?? [];
 
         return RefreshIndicator(
           onRefresh: () async => setState(() {}),
@@ -241,29 +230,30 @@ class _ActualitePageState extends State<ActualitePage> {
                 ),
               ),
               const SizedBox(height: 12),
-              if (items.isEmpty)
+              if (!snapshot.hasData)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (items.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Text('Aucune publication pour le moment.',
                       style: TextStyle(color: Colors.grey)),
                 ),
-              for (final entry in items)
+              for (final it in items)
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   child: _PostCard(
-                    item: GalleryItem.fromMap(
-                        Map<String, dynamic>.from(entry.value), entry.key),
-                    index: entry.key,
+                    data: it,
                     userEmail: user?.email,
-                    canEdit: isAdmin || entry.value['authorEmail'] == user?.email,
-                    onLike: () => _toggleLike(entry.key, user?.email ?? ''),
-                    onComment: () => _openComments(
-                        entry.key,
-                        GalleryItem.fromMap(
-                            Map<String, dynamic>.from(entry.value), entry.key),
-                        user),
-                    onDelete: () => _delete(entry.key),
+                    canEdit: isAdmin || it['authorEmail'] == user?.email,
+                    onLike: () =>
+                        _toggleLike(it['id'], it['likes'] ?? [], user?.email ?? ''),
+                    onComment: () =>
+                        _openComments(it['id'], it['comments'] ?? [], user),
+                    onDelete: () => _confirmDelete(it['id']),
                   ),
                 ),
             ],
@@ -275,8 +265,7 @@ class _ActualitePageState extends State<ActualitePage> {
 }
 
 class _PostCard extends StatelessWidget {
-  final GalleryItem item;
-  final int index;
+  final Map<String, dynamic> data;
   final String? userEmail;
   final bool canEdit;
   final VoidCallback onLike;
@@ -284,8 +273,7 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _PostCard({
-    required this.item,
-    required this.index,
+    required this.data,
     required this.userEmail,
     required this.canEdit,
     required this.onLike,
@@ -295,7 +283,14 @@ class _PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final liked = item.likes.contains(userEmail);
+    final likes = List<String>.from(data['likes'] ?? []);
+    final comments = List<Map<String, dynamic>>.from(data['comments'] ?? []);
+    final liked = likes.contains(userEmail);
+    final author = data['author'] ?? '';
+    final authorEmail = data['authorEmail'] ?? '';
+    final image = data['image'] as String?;
+    final caption = data['caption'] ?? '';
+
     return GlassCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -305,11 +300,19 @@ class _PostCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
             child: Row(
               children: [
-                UserAvatar(email: item.authorEmail, fallbackName: item.author),
+                UserAvatar(email: authorEmail, fallbackName: author),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(item.author,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(author,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                      AdminBadge(authorEmail: authorEmail),
+                    ],
+                  ),
                 ),
                 if (canEdit)
                   IconButton(
@@ -319,11 +322,11 @@ class _PostCard extends StatelessWidget {
               ],
             ),
           ),
-          if (item.image != null)
+          if (image != null)
             AspectRatio(
               aspectRatio: 4 / 5,
               child: Image.memory(
-                base64Decode(item.image!.split(',').last),
+                base64Decode(image.split(',').last),
                 fit: BoxFit.cover,
                 width: double.infinity,
               ),
@@ -340,18 +343,18 @@ class _PostCard extends StatelessWidget {
                           color: liked ? Colors.redAccent : null),
                       onPressed: onLike,
                     ),
-                    Text('${item.likes.length}'),
+                    Text('${likes.length}'),
                     IconButton(
                       icon: const Icon(Icons.mode_comment_outlined),
                       onPressed: onComment,
                     ),
-                    Text('${item.comments.length}'),
+                    Text('${comments.length}'),
                   ],
                 ),
-                if (item.caption.isNotEmpty)
+                if (caption.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(item.caption),
+                    child: Text(caption),
                   ),
               ],
             ),
