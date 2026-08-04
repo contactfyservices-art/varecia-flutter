@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/badge_service.dart';
 import '../services/firestore_service.dart';
+import '../services/presence_service.dart';
 import 'pages/accueil_page.dart';
 import 'pages/bibliotheque_page.dart';
 import 'pages/reunion_page.dart';
@@ -28,8 +30,35 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
+  Timer? _presenceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _pingPresence();
+    _presenceTimer =
+        Timer.periodic(const Duration(seconds: 60), (_) => _pingPresence());
+  }
+
+  void _pingPresence() {
+    final email = context.read<AuthService>().currentUser?.email;
+    if (email != null) PresenceService.instance.heartbeat(email);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _pingPresence();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _presenceTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _markSeenIfNeeded(String? badgeKey) async {
     if (badgeKey == null) return;
