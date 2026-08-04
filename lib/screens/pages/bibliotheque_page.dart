@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/models.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/user_avatar.dart';
+import '../../widgets/admin_badge.dart';
 
 class BibliothequePage extends StatefulWidget {
   const BibliothequePage({super.key});
@@ -28,18 +29,20 @@ class _BibliothequePageState extends State<BibliothequePage> {
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
-    if ((file.size) > 3 * 1024 * 1024) {
+    if (file.size > 900 * 1024) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fichier trop lourd (max 3 Mo).')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Fichier trop lourd pour un envoi direct (max ~900 Ko). '
+              'Utilise plutôt un lien Google Drive ci-dessus pour les gros fichiers.'),
+          duration: Duration(seconds: 4)));
       return;
     }
     setState(() => _pickedFile = file);
   }
 
-  Future<void> _add(AppUser user) async {
+  Future<void> _add(dynamic user) async {
     if (_titleCtrl.text.trim().isEmpty) return;
-    final items = await _fs.getJSON('library', []) as List;
 
     String? fileData;
     String? fileName;
@@ -51,31 +54,42 @@ class _BibliothequePageState extends State<BibliothequePage> {
       fileType = _pickedFile!.extension;
     }
 
-    items.add(LibraryItem(
-      index: items.length,
-      title: _titleCtrl.text.trim(),
-      author: user.fullName,
-      authorEmail: user.email,
-      date: DateTime.now().toString(),
-      link: _linkCtrl.text.trim().isEmpty ? null : _linkCtrl.text.trim(),
-      fileData: fileData,
-      fileName: fileName,
-      fileType: fileType,
-    ).toMap());
-    await _fs.setJSON('library', items);
+    await _fs.addItem('library_items', {
+      'title': _titleCtrl.text.trim(),
+      'author': user.fullName,
+      'authorEmail': user.email,
+      'link': _linkCtrl.text.trim().isEmpty ? null : _linkCtrl.text.trim(),
+      'fileData': fileData,
+      'fileName': fileName,
+      'fileType': fileType,
+    });
     _titleCtrl.clear();
     _linkCtrl.clear();
     setState(() => _pickedFile = null);
     SoundService.instance.playSuccess();
   }
 
-  Future<void> _delete(int index) async {
-    final items = await _fs.getJSON('library', []) as List;
-    items.removeAt(index);
-    await _fs.setJSON('library', items);
+  Future<void> _confirmDelete(String docId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer cette ressource ?'),
+        content: const Text('Cette action est définitive.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Supprimer',
+                  style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (ok == true) await _fs.deleteItem('library_items', docId);
   }
 
-  Future<void> _editTitle(int index, String currentTitle) async {
+  Future<void> _editTitle(String docId, String currentTitle) async {
     final ctrl = TextEditingController(text: currentTitle);
     final newTitle = await showDialog<String>(
       context: context,
@@ -93,9 +107,7 @@ class _BibliothequePageState extends State<BibliothequePage> {
       ),
     );
     if (newTitle == null) return;
-    final items = await _fs.getJSON('library', []) as List;
-    items[index]['title'] = newTitle;
-    await _fs.setJSON('library', items);
+    await _fs.updateItem('library_items', docId, {'title': newTitle});
   }
 
   @override
@@ -103,10 +115,10 @@ class _BibliothequePageState extends State<BibliothequePage> {
     final user = context.watch<AuthService>().currentUser;
     final isAdmin = context.watch<AuthService>().isAdmin;
 
-    return StreamBuilder(
-      stream: _fs.watchJSON('library', []),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _fs.watchItems('library_items'),
       builder: (context, snapshot) {
-        final items = (snapshot.data ?? []) as List;
+        final items = snapshot.data ?? [];
 
         return RefreshIndicator(
           onRefresh: () async => setState(() {}),
@@ -131,7 +143,12 @@ class _BibliothequePageState extends State<BibliothequePage> {
                     TextField(
                       controller: _linkCtrl,
                       decoration: const InputDecoration(
-                          labelText: 'Lien (URL) — optionnel'),
+                        labelText: 'Lien Google Drive (recommandé pour les gros fichiers)',
+                        helperText: 'Astuce : partage ton fichier sur Drive avec '
+                            '"Tout le monde avec le lien", puis colle le lien ici — '
+                            'aucune limite de taille.',
+                        helperMaxLines: 3,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -141,7 +158,7 @@ class _BibliothequePageState extends State<BibliothequePage> {
                             onPressed: _pickFile,
                             icon: const Icon(Icons.attach_file),
                             label: Text(_pickedFile == null
-                                ? 'Joindre un fichier — optionnel'
+                                ? 'OU joindre un petit fichier (<900 Ko)'
                                 : _pickedFile!.name,
                                 overflow: TextOverflow.ellipsis),
                           ),
@@ -166,42 +183,78 @@ class _BibliothequePageState extends State<BibliothequePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (items.isEmpty)
+              if (!snapshot.hasData)
+                const Center(child: CircularProgressIndicator())
+              else if (items.isEmpty)
                 const Text('Aucune ressource pour le moment.',
                     style: TextStyle(color: Colors.grey)),
-              for (int i = 0; i < items.length; i++)
+              for (final it in items)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: GlassCard(
                     child: Builder(builder: (context) {
-                      final it = LibraryItem.fromMap(
-                          Map<String, dynamic>.from(items[i]), i);
+                      final title = it['title'] ?? '';
+                      final author = it['author'] ?? '';
+                      final authorEmail = it['authorEmail'] ?? '';
+                      final link = it['link'] as String?;
+                      final fileName = it['fileName'] as String?;
                       final canEdit =
-                          isAdmin || it.authorEmail == user?.email;
+                          isAdmin || authorEmail == user?.email;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(it.title,
+                          Row(
+                            children: [
+                              UserAvatar(
+                                  email: authorEmail,
+                                  fallbackName: author,
+                                  radius: 14),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text('Ajouté par $author',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey)),
+                                    ),
+                                    AdminBadge(authorEmail: authorEmail),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(title,
                               style:
                                   const TextStyle(fontWeight: FontWeight.bold)),
-                          Text('Ajouté par ${it.author}',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.grey)),
-                          if (it.link != null) ...[
-                            const SizedBox(height: 4),
-                            Text(it.link!,
-                                style: const TextStyle(
-                                    color: Colors.blue,
-                                    decoration: TextDecoration.underline)),
-                          ],
-                          if (it.fileName != null) ...[
+                          if (link != null) ...[
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.insert_drive_file, size: 16),
+                                const Icon(Icons.link, size: 14),
                                 const SizedBox(width: 4),
                                 Expanded(
-                                    child: Text(it.fileName!,
+                                  child: Text(link,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Colors.blue,
+                                          decoration:
+                                              TextDecoration.underline)),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (fileName != null) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.insert_drive_file, size: 14),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                    child: Text(fileName,
                                         overflow: TextOverflow.ellipsis)),
                               ],
                             ),
@@ -211,12 +264,14 @@ class _BibliothequePageState extends State<BibliothequePage> {
                             Row(
                               children: [
                                 TextButton(
-                                  onPressed: () => _editTitle(i, it.title),
+                                  onPressed: () =>
+                                      _editTitle(it['id'], title),
                                   child: const Text('Modifier'),
                                 ),
                                 TextButton(
-                                  onPressed: () => _delete(i),
-                                  child: const Text('Supprimer'),
+                                  onPressed: () => _confirmDelete(it['id']),
+                                  child: const Text('Supprimer',
+                                      style: TextStyle(color: Colors.red)),
                                 ),
                               ],
                             ),
