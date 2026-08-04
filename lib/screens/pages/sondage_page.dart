@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/user_avatar.dart';
 
 class SondagePage extends StatefulWidget {
   const SondagePage({super.key});
@@ -115,13 +116,31 @@ class _SondagePageState extends State<SondagePage> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(p.author,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(p.date,
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey)),
-                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              UserAvatar(
+                                  email: p.authorEmail,
+                                  fallbackName: p.author,
+                                  radius: 14),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(p.author,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    Text(p.date,
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
                           Text(p.text),
                           if (canEdit) ...[
                             const SizedBox(height: 6),
