@@ -3,10 +3,11 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/user_avatar.dart';
+import '../../widgets/online_dot.dart';
 
 /// Affiche uniquement les membres approuvés qui partagent la même
-/// section (A/B/C) que l'utilisateur connecté — assignée par l'admin
-/// depuis l'onglet Administration.
+/// section (A/B/C) que l'utilisateur connecté.
 class MaSectionPage extends StatelessWidget {
   const MaSectionPage({super.key});
 
@@ -61,24 +62,20 @@ class MaSectionPage extends StatelessWidget {
                   child: GlassCard(
                     child: Row(
                       children: [
-                        if (m['active'] ?? true)
-                          Container(
-                            width: 10,
-                            height: 10,
-                            margin: const EdgeInsets.only(right: 10),
-                            decoration: const BoxDecoration(
-                                color: Colors.green, shape: BoxShape.circle),
-                          )
-                        else
-                          const SizedBox(width: 20),
-                        CircleAvatar(
-                          radius: 18,
-                          child: Text(
-                            (m['prenom'] ?? '?')
-                                .toString()
-                                .substring(0, 1)
-                                .toUpperCase(),
-                          ),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            UserAvatar(
+                              email: m['email'] ?? '',
+                              fallbackName: m['prenom'] ?? '?',
+                              radius: 18,
+                            ),
+                            Positioned(
+                              bottom: -1,
+                              right: -1,
+                              child: OnlineDot(email: m['email'] ?? ''),
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 10),
                         Expanded(
