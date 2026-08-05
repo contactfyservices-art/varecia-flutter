@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/badge_service.dart';
-import '../services/firestore_service.dart';
 import '../services/presence_service.dart';
 import 'pages/accueil_page.dart';
 import 'pages/bibliotheque_page.dart';
@@ -62,8 +61,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   Future<void> _markSeenIfNeeded(String? badgeKey) async {
     if (badgeKey == null) return;
-    final data = await FirestoreService.instance.getJSON(badgeKey, []);
-    await BadgeService.instance.markSeen(badgeKey, (data as List).length);
+    await BadgeService.instance.markSeenNow(badgeKey);
   }
 
   Future<void> _logout() async {
@@ -84,12 +82,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final destinations = <_Dest>[
       const _Dest('Accueil', Icons.home_outlined, AccueilPage()),
       const _Dest('Bibliothèque', Icons.menu_book_outlined, BibliothequePage(),
-          badgeKey: 'library'),
+          badgeKey: 'library_items'),
       const _Dest('Réunion', Icons.videocam_outlined, ReunionPage()),
       const _Dest('Actualité', Icons.dynamic_feed_outlined, ActualitePage(),
-          badgeKey: 'gallery'),
+          badgeKey: 'gallery_items'),
       const _Dest('Notes', Icons.forum_outlined, SondagePage(),
-          badgeKey: 'posts'),
+          badgeKey: 'posts_items'),
       const _Dest('Messages', Icons.chat_bubble_outline, MessagesPage()),
       const _Dest('Ma Section', Icons.groups_outlined, MaSectionPage()),
       const _Dest('Profil', Icons.person_outline, ProfilPage()),
