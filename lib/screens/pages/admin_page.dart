@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
 import '../../services/sound_service.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/organigramme_card.dart';
+import '../../widgets/zoky_card.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -35,8 +37,9 @@ class _AdminPageState extends State<AdminPage> {
     if (email.isEmpty) return;
     final admins = await _fs.getJSON('admins', []) as List;
     if (admins.length >= 20) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Limite de 20 administrateurs atteinte.')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Limite de 20 administrateurs atteinte.')));
       return;
     }
     if (!admins.contains(email)) admins.add(email);
@@ -81,8 +84,7 @@ class _AdminPageState extends State<AdminPage> {
     );
     if (link == null || link.isEmpty) return;
     final v = await _fs.getJSON('appVersion', {'v': 1, 'url': ''});
-    await _fs.setJSON(
-        'appVersion', {'v': (v['v'] ?? 1) + 1, 'url': link});
+    await _fs.setJSON('appVersion', {'v': (v['v'] ?? 1) + 1, 'url': link});
     SoundService.instance.playSuccess();
   }
 
@@ -110,6 +112,19 @@ class _AdminPageState extends State<AdminPage> {
     return StreamBuilder(
       stream: _fs.watchJSON('users', []),
       builder: (context, usersSnap) {
+        if (usersSnap.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('Erreur de chargement des membres :\n${usersSnap.error}',
+                  textAlign: TextAlign.center),
+            ),
+          );
+        }
+        if (!usersSnap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
         final users = (usersSnap.data ?? []) as List;
         final pending = users.where((u) => u['status'] == 'pending').toList();
         final approved =
@@ -118,6 +133,11 @@ class _AdminPageState extends State<AdminPage> {
         return StreamBuilder(
           stream: _fs.watchJSON('admins', []),
           builder: (context, adminsSnap) {
+            if (adminsSnap.hasError) {
+              return Center(
+                child: Text('Erreur de chargement des admins :\n${adminsSnap.error}'),
+              );
+            }
             final admins = (adminsSnap.data ?? []) as List;
 
             return ListView(
@@ -182,12 +202,19 @@ class _AdminPageState extends State<AdminPage> {
                           section: u['section'] ?? '',
                           active: u['active'] ?? true,
                           onSectionChanged: (s) => _setSection(u['email'], s),
-                          onActiveChanged: (v) =>
-                              _toggleActive(u['email'], v),
+                          onActiveChanged: (v) => _toggleActive(u['email'], v),
                         ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // Organigramme — géré ici, directement visible côté admin.
+                const OrganigrammeCard(),
+                const SizedBox(height: 16),
+
+                // ZOKY — anciens membres.
+                const ZokyCard(),
                 const SizedBox(height: 16),
 
                 GlassCard(
@@ -262,6 +289,7 @@ class _AdminPageState extends State<AdminPage> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 30),
               ],
             );
           },
@@ -294,8 +322,8 @@ class _MemberRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
-        border: Border(
-            bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+        border:
+            Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
