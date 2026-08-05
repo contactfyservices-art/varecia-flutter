@@ -19,6 +19,19 @@ class _ChatPageState extends State<ChatPage> {
   final _ctrl = TextEditingController();
   final _scrollCtrl = ScrollController();
 
+  @override
+  void initState() {
+    super.initState();
+    // Marque la conversation comme lue dès l'ouverture de l'écran.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final myEmail = context.read<AuthService>().currentUser?.email;
+      if (myEmail != null) {
+        MessagingService.instance
+            .markConversationRead(myEmail, widget.peerEmail);
+      }
+    });
+  }
+
   Future<void> _send(String myEmail, String myName) async {
     if (_ctrl.text.trim().isEmpty) return;
     final text = _ctrl.text.trim();
@@ -64,9 +77,6 @@ class _ChatPageState extends State<ChatPage> {
                   .watchConversation(user.email, widget.peerEmail),
               builder: (context, snapshot) {
                 final messages = snapshot.data ?? [];
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
                 if (messages.isEmpty) {
                   return const Center(
                     child: Text('Aucun message pour le moment. Dis bonjour !',
@@ -77,6 +87,10 @@ class _ChatPageState extends State<ChatPage> {
                   if (_scrollCtrl.hasClients) {
                     _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
                   }
+                  // Re-marque comme lu si un nouveau message arrive
+                  // pendant que l'écran est déjà ouvert.
+                  MessagingService.instance
+                      .markConversationRead(user.email, widget.peerEmail);
                 });
                 return ListView.builder(
                   controller: _scrollCtrl,
