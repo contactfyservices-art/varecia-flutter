@@ -6,6 +6,7 @@ import '../../widgets/glass_card.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/online_dot.dart';
 import '../../widgets/organigramme_card.dart';
+import '../../widgets/zoky_card.dart';
 
 class MaSectionPage extends StatelessWidget {
   const MaSectionPage({super.key});
@@ -34,6 +35,8 @@ class MaSectionPage extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             children: [
               const OrganigrammeCard(),
+              const SizedBox(height: 16),
+              const ZokyCard(),
               const SizedBox(height: 20),
               Text(
                 user.section.isEmpty
