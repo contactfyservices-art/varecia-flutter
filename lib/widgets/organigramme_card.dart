@@ -5,8 +5,6 @@ import '../services/firestore_service.dart';
 import 'glass_card.dart';
 import 'user_avatar.dart';
 
-/// Postes fixes de l'organigramme "ZOKY", avec le nombre de places
-/// disponibles pour chacun.
 const Map<String, int> kOrganigrammePostes = {
   'Président': 1,
   'Vice président': 1,
@@ -25,8 +23,8 @@ const Map<String, int> kOrganigrammePostes = {
 class OrganigrammeCard extends StatelessWidget {
   const OrganigrammeCard({super.key});
 
-  Future<void> _editPoste(
-      BuildContext context, String poste, int maxSlots, List<String> current) async {
+  Future<void> _editPoste(BuildContext context, String poste, int maxSlots,
+      List<String> current) async {
     final fs = FirestoreService.instance;
     final allUsers = await fs.getJSON('users', []) as List;
     final approved =
@@ -46,6 +44,9 @@ class OrganigrammeCard extends StatelessWidget {
                 Text('$maxSlots place(s) maximum',
                     style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 8),
+                if (approved.isEmpty)
+                  const Text('Aucun membre approuvé pour le moment.',
+                      style: TextStyle(color: Colors.grey)),
                 for (final u in approved)
                   CheckboxListTile(
                     dense: true,
@@ -73,9 +74,8 @@ class OrganigrammeCard extends StatelessWidget {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Annuler'),
-            ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annuler')),
             ElevatedButton(
               onPressed: () async {
                 final data =
@@ -101,27 +101,34 @@ class OrganigrammeCard extends StatelessWidget {
     return StreamBuilder(
       stream: fs.watchJSON('organigramme', <String, dynamic>{}),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return GlassCard(
+            child: Text('Erreur organigramme : ${snapshot.error}'),
+          );
+        }
         final data = Map<String, dynamic>.from(snapshot.data ?? {});
 
         return GlassCard(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text('Organigramme — ZOKY',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 10),
-              for (final entry in kOrganigrammePostes.entries)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _PosteRow(
-                    poste: entry.key,
-                    maxSlots: entry.value,
-                    assignedEmails:
-                        List<String>.from(data[entry.key] ?? []),
-                    isAdmin: isAdmin,
-                    onEdit: () => _editPoste(context, entry.key, entry.value,
-                        List<String>.from(data[entry.key] ?? [])),
-                  ),
+              const Text('Organigramme',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 20),
+              for (int i = 0; i < kOrganigrammePostes.length; i++)
+                _TierRow(
+                  poste: kOrganigrammePostes.keys.elementAt(i),
+                  maxSlots: kOrganigrammePostes.values.elementAt(i),
+                  assignedEmails: List<String>.from(
+                      data[kOrganigrammePostes.keys.elementAt(i)] ?? []),
+                  isAdmin: isAdmin,
+                  isFirst: i == 0,
+                  onEdit: () => _editPoste(
+                      context,
+                      kOrganigrammePostes.keys.elementAt(i),
+                      kOrganigrammePostes.values.elementAt(i),
+                      List<String>.from(
+                          data[kOrganigrammePostes.keys.elementAt(i)] ?? [])),
                 ),
             ],
           ),
@@ -131,71 +138,97 @@ class OrganigrammeCard extends StatelessWidget {
   }
 }
 
-class _PosteRow extends StatelessWidget {
+/// Un "niveau" de la pyramide : trait de connexion vertical depuis le
+/// niveau précédent, puis le titre du poste, puis les photos des
+/// personnes qui l'occupent (ou "Vacant").
+class _TierRow extends StatelessWidget {
   final String poste;
   final int maxSlots;
   final List<String> assignedEmails;
   final bool isAdmin;
+  final bool isFirst;
   final VoidCallback onEdit;
 
-  const _PosteRow({
+  const _TierRow({
     required this.poste,
     required this.maxSlots,
     required this.assignedEmails,
     required this.isAdmin,
+    required this.isFirst,
     required this.onEdit,
   });
 
   @override
   Widget build(BuildContext context) {
     final fs = FirestoreService.instance;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('$poste ($maxSlots)',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              if (assignedEmails.isEmpty)
-                const Text('Vacant',
-                    style: TextStyle(color: Colors.grey, fontSize: 12))
-              else
-                FutureBuilder(
-                  future: fs.getJSON('users', []),
-                  builder: (context, snap) {
-                    final allUsers = (snap.data ?? []) as List;
-                    return Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: assignedEmails.map((email) {
-                        final match = allUsers.cast<Map<String, dynamic>>().firstWhere(
-                              (u) => u['email'] == email,
-                              orElse: () => {},
-                            );
-                        final name = match.isEmpty
-                            ? email
-                            : '${match['prenom']} ${match['nom']}';
-                        return Chip(
-                          avatar: UserAvatar(
-                              email: email, fallbackName: name, radius: 10),
-                          label: Text(name, style: const TextStyle(fontSize: 12)),
+        if (!isFirst)
+          Container(width: 2, height: 18, color: Colors.grey.withOpacity(0.4)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(poste,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      if (isAdmin)
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 16),
+                          onPressed: onEdit,
                           visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (assignedEmails.isEmpty)
+                    const Text('Vacant',
+                        style: TextStyle(color: Colors.grey, fontSize: 12))
+                  else
+                    FutureBuilder(
+                      future: fs.getJSON('users', []),
+                      builder: (context, snap) {
+                        final allUsers = (snap.data ?? []) as List;
+                        return Wrap(
+                          spacing: 14,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: assignedEmails.map((email) {
+                            final match = allUsers
+                                .cast<Map<String, dynamic>>()
+                                .firstWhere((u) => u['email'] == email,
+                                    orElse: () => {});
+                            final name = match.isEmpty
+                                ? email
+                                : '${match['prenom']} ${match['nom']}';
+                            return Column(
+                              children: [
+                                UserAvatar(
+                                    email: email,
+                                    fallbackName: name,
+                                    radius: 26),
+                                const SizedBox(height: 4),
+                                Text(name,
+                                    style: const TextStyle(fontSize: 11),
+                                    textAlign: TextAlign.center),
+                              ],
+                            );
+                          }).toList(),
                         );
-                      }).toList(),
-                    );
-                  },
-                ),
-            ],
-          ),
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-        if (isAdmin)
-          IconButton(
-            icon: const Icon(Icons.edit, size: 18),
-            onPressed: onEdit,
-          ),
+        const SizedBox(height: 14),
       ],
     );
   }
