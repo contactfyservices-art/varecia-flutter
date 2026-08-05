@@ -4,10 +4,8 @@ import 'dart:convert';
 /// Service d'accès à Firestore. Conserve les méthodes historiques
 /// getJSON/setJSON/watchJSON (documents uniques, utilisées par users,
 /// admins, adminCode, meeting, appVersion, content_accueil, conv_*)
-/// ET ajoute de nouvelles méthodes basées sur des SOUS-COLLECTIONS
-/// pour tout ce qui grossit sans limite (galerie, notes, bibliothèque)
-/// — chaque élément devient son propre petit document au lieu d'un
-/// tableau géant, ce qui évite la limite de 1 Mo par document Firestore.
+/// ET les méthodes basées sur des SOUS-COLLECTIONS pour tout ce qui
+/// grossit sans limite (galerie, notes, bibliothèque, messages).
 class FirestoreService {
   FirestoreService._();
   static final instance = FirestoreService._();
@@ -15,7 +13,7 @@ class FirestoreService {
   final _db = FirebaseFirestore.instance;
   DocumentReference get _root => _db.collection('app_data').doc('main');
 
-  // === Ancien système (document unique, tableau JSON) — inchangé ===
+  // === Ancien système (document unique, tableau JSON) ===
   Future<dynamic> getJSON(String key, dynamic fallback) async {
     final snap = await _root.get();
     final data = snap.data() as Map<String, dynamic>?;
@@ -43,12 +41,20 @@ class FirestoreService {
     });
   }
 
+  /// Ajoute un élément à une liste EXISTANTE sans jamais l'écraser,
+  /// même en cas de lecture ratée entre-temps — contrairement à
+  /// getJSON+setJSON, cette opération est atomique côté serveur
+  /// (empêche la disparition de membres lors d'une inscription).
+  Future<void> arrayUnion(String key, dynamic item) async {
+    await _root.update({
+      key: FieldValue.arrayUnion([item])
+    });
+  }
+
   // === Nouveau système (sous-collection, un document par élément) ===
   CollectionReference _col(String name) =>
       _db.collection('app_data').doc('main').collection(name);
 
-  /// Ajoute un nouvel élément (photo, note, ressource...) comme document
-  /// individuel — retourne son identifiant Firestore.
   Future<String> addItem(String collectionName, Map<String, dynamic> data) async {
     final doc = await _col(collectionName).add({
       ...data,
@@ -66,8 +72,6 @@ class FirestoreService {
     await _col(collectionName).doc(docId).delete();
   }
 
-  /// Flux des éléments les plus récents en premier, avec leur id Firestore
-  /// inclus sous la clé 'id' de chaque map.
   Stream<List<Map<String, dynamic>>> watchItems(String collectionName) {
     return _col(collectionName)
         .orderBy('createdAt', descending: true)
