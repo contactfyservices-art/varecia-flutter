@@ -5,6 +5,7 @@ import '../../services/firestore_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/online_dot.dart';
+import '../../widgets/unread_dot.dart';
 import '../../widgets/fade_slide_in.dart';
 import '../../widgets/shimmer_loading.dart';
 import 'chat_page.dart';
@@ -122,6 +123,14 @@ class _MessagesPageState extends State<MessagesPage> {
                                   child: OnlineDot(
                                       email: others[i]['email'] ?? ''),
                                 ),
+                                Positioned(
+                                  top: -1,
+                                  right: -1,
+                                  child: UnreadDot(
+                                    myEmail: user.email,
+                                    peerEmail: others[i]['email'] ?? '',
+                                  ),
+                                ),
                               ],
                             ),
                             title:
@@ -135,8 +144,8 @@ class _MessagesPageState extends State<MessagesPage> {
                                 OnlineLabel(email: others[i]['email'] ?? ''),
                               ],
                             ),
-                            onTap: () {
-                              Navigator.push(
+                            onTap: () async {
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => ChatPage(
@@ -146,6 +155,9 @@ class _MessagesPageState extends State<MessagesPage> {
                                   ),
                                 ),
                               );
+                              // Rafraîchit les points rouges au retour,
+                              // puisque cette conversation vient d'être lue.
+                              if (mounted) setState(() {});
                             },
                           ),
                         ),
