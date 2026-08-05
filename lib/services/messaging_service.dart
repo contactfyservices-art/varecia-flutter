@@ -1,9 +1,6 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firestore_service.dart';
 
-/// Messagerie privée entre membres, stockée dans app_data comme le
-/// reste de l'appli — chaque conversation est un document dont la clé
-/// est les deux e-mails triés alphabétiquement et combinés, pour que
-/// les deux personnes retombent toujours sur le même document.
 class MessagingService {
   MessagingService._();
   static final instance = MessagingService._();
@@ -37,5 +34,35 @@ class MessagingService {
       'date': DateTime.now().toIso8601String(),
     });
     await _fs.setJSON(key, messages);
+  }
+
+  Future<DateTime?> _lastRead(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    final iso = prefs.getString('lastRead_$key');
+    return iso == null ? null : DateTime.tryParse(iso);
+  }
+
+  /// Marque la conversation comme lue à l'instant présent.
+  Future<void> markConversationRead(String myEmail, String peerEmail) async {
+    final key = conversationKey(myEmail, peerEmail);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lastRead_$key', DateTime.now().toIso8601String());
+  }
+
+  /// Vrai si le dernier message de la conversation vient du pair (pas de
+  /// moi) et est arrivé après la dernière fois où j'ai ouvert cette
+  /// conversation.
+  Stream<bool> watchHasUnread(String myEmail, String peerEmail) async* {
+    final key = conversationKey(myEmail, peerEmail);
+    final lastRead = await _lastRead(key);
+    yield* watchConversation(myEmail, peerEmail).map((messages) {
+      if (messages.isEmpty) return false;
+      final last = messages.last;
+      if (last['from'] == myEmail) return false;
+      final date = DateTime.tryParse(last['date'] ?? '');
+      if (date == null) return false;
+      if (lastRead == null) return true;
+      return date.isAfter(lastRead);
+    });
   }
 }
