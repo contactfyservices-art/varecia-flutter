@@ -4,9 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import 'firestore_service.dart';
 
-/// Gestion des comptes en interne (pas de Firebase Auth, pas de provider
-/// tiers) — reproduit exactement la logique de la version HTML :
-/// les comptes sont stockés dans le document `users` de `app_data`.
 class AuthService extends ChangeNotifier {
   AppUser? currentUser;
   bool isAdmin = false;
@@ -31,8 +28,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// À appeler au démarrage de l'app : relit la session sauvegardée
-  /// localement et recharge l'utilisateur depuis Firestore si présent.
   Future<void> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final savedEmail = prefs.getString(_kSessionEmail);
@@ -77,7 +72,7 @@ class AuthService extends ChangeNotifier {
     isAdmin = admins.contains(email);
     await _saveSession();
     notifyListeners();
-    return null; // pas d'erreur
+    return null;
   }
 
   Future<String?> signup({
@@ -99,8 +94,7 @@ class AuthService extends ChangeNotifier {
       passwordHash: password,
       status: 'pending',
     );
-    users.add(newUser.toMap());
-    await _fs.setJSON('users', users);
+    await _fs.arrayUnion('users', newUser.toMap());
     return null;
   }
 
@@ -113,9 +107,6 @@ class AuthService extends ChangeNotifier {
     return null;
   }
 
-  /// Met à jour la photo de l'utilisateur actuellement connecté EN MÉMOIRE,
-  /// après qu'elle ait été enregistrée dans Firestore (corrige le bug
-  /// où la photo ne s'affichait jamais après changement).
   void updateCurrentUserPhoto(String base64Photo) {
     if (currentUser == null) return;
     currentUser = currentUser!.copyWith(photo: base64Photo);
